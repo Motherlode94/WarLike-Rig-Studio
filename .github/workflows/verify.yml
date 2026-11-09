@@ -14,6 +14,7 @@ jobs:
         run: |
           node --check studio.js
           node --check rig-core.mjs
+          node --check rig-editor.mjs
       - name: Automated rig tests
         run: node --test tests/*.test.mjs
       - name: Verify app files
@@ -23,3 +24,6 @@ jobs:
           test -s rig-core.mjs
           grep -q 'id="viewport"' index.html
           grep -q 'id="rig"' index.html
+          grep -q 'id="jointSelect"' index.html
+          grep -q 'id="jointX"' index.html
+          grep -q 'id="mirrorJoint"' index.html
