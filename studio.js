@@ -102,11 +102,15 @@ function boneRig(plan) {
     map.set(b.name,bone);
   }
   const group=new THREE.Group();group.name="WarLikeRig";
+  const worldPositions=new Map(plan.bones.map(b=>[b.name,new THREE.Vector3(...b.position)]));
+  // Compute local transforms against the parent's ORIGINAL world position.
+  // Subtracting already-local parent coordinates breaks all deeper chains.
   for(const b of plan.bones){
     const bone=map.get(b.name);
     if(b.parent){
-      const parent=map.get(b.parent),position=parent.position.clone();
-      bone.position.sub(position);parent.add(bone);
+      const parent=map.get(b.parent);
+      bone.position.copy(worldPositions.get(b.name)).sub(worldPositions.get(b.parent));
+      parent.add(bone);
     }else group.add(bone);
   }
   group.updateMatrixWorld(true);
