@@ -47,30 +47,44 @@ function syncMotionUI(){
   $("motionTimeLabel").textContent=motion.time.toFixed(2).replace(".",",")+" s / "+def.duration.toFixed(2).replace(".",",")+" s";
   $("motionAmplitudeLabel").textContent=$("motionAmplitude").value+" %";
   $("motionSpeedLabel").textContent=(Number($("motionSpeed").value)/100).toLocaleString("fr")+"×";
+  $("motionSmoothnessLabel").textContent=$("motionSmoothness").value+" %";
   $("motionPlay").disabled=!rigMap||pending;
   $("motionPause").disabled=!rigMap||!motion.playing||pending;
   $("motionTime").disabled=!rigMap||pending;
 }
-function sampleMotion(){
+function sampleMotion({instant=false,dt=1/60}={}){
   if(!rigMap)return;
-  restoreReference();
   const preset=$("motionPreset").value;
   let poses={};
   if(preset.startsWith("native:")){
+    // Native animation keys belong to the source GLB. Never rewrite the original clip.
+    restoreReference();
     const clip=nativeClips[Number(preset.slice(7))];
     if(clip&&nativeMixer){nativeMixer.clipAction(clip).play();nativeMixer.setTime(motion.time);}
   }else{
     poses=testAngles(preset,motion.time,Number($("motionAmplitude").value)/100);
-    for(const [name,rotation] of Object.entries(poses)){
-      const bone=rigMap.get(name);if(bone)bone.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(...rotation,"XYZ")));
+    // Quaternion damping toward the desired pose, rather than snapping from
+    // bind pose every frame. Each target is computed FROM the stored rest pose.
+    const smoothing=Number($("motionSmoothness").value)/100;
+    const response=THREE.MathUtils.lerp(32,5.5,smoothing);
+    const alpha=instant?1:1-Math.exp(-response*Math.min(.1,Math.max(0,dt)));
+    for(const [name,bone] of rigMap){
+      const rest=rigPose.get(name);
+      if(!rest)continue;
+      const angles=poses[name]||[0,0,0];
+      const desired=rest.clone().multiply(new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(...angles,"XYZ")
+      ));
+      bone.quaternion.slerp(desired,alpha);
     }
   }
   poseActive=true;
-  $("modeRigged").checked=true;
-  setMode("rigged");
+  $("modeRigged").checked=true;setMode("rigged");
   const changed=diagnosticSummary(poses);
-  $("motionDiagnostic").textContent=preset.startsWith("native:")?"Clip GLB : "+motionDef().label+". Rig d'origine préservé.":
-    motionDef().label+" · "+changed.length+" articulation(s) sollicitées : "+changed.join(", ")+". Aucune modification des poids.";
+  $("motionDiagnostic").textContent=preset.startsWith("native:")
+    ?"Clip GLB : "+motionDef().label+". Animation et rig d'origine conservés."
+    :motionDef().label+" · "+changed.length+" articulation(s) sollicitées : "+changed.join(", ")+
+     ". Transitions amorties, sans modification du squelette ni des poids.";
   syncMotionUI();
 }
 function resetMotion(){
@@ -330,21 +344,22 @@ $("resetPose").addEventListener("click",resetMotion);
 $("showRestPose").addEventListener("click",resetMotion);
 $("motionPreset").addEventListener("change",()=>{
   motion.playing=false;motion.previousFrame=null;motion.time=0;
-  if(rigMap)sampleMotion();else syncMotionUI();
+  if(rigMap)sampleMotion({instant:true});else syncMotionUI();
 });
 $("motionTime").addEventListener("input",event=>{
   motion.time=Number(event.target.value);
-  if(rigMap)sampleMotion();else syncMotionUI();
+  if(rigMap)sampleMotion({instant:true});else syncMotionUI();
 });
 $("motionAmplitude").addEventListener("input",()=>{
-  if(rigMap)sampleMotion();else syncMotionUI();
+  if(rigMap)sampleMotion({instant:true});else syncMotionUI();
 });
 $("motionSpeed").addEventListener("input",syncMotionUI);
+$("motionSmoothness").addEventListener("input",syncMotionUI);
 $("motionPlay").addEventListener("click",()=>{
   if(!rigMap||pending)return;
   if(motion.time>=motionDef().duration)motion.time=0;
   motion.playing=true;motion.previousFrame=null;
-  sampleMotion();syncMotionUI();
+  sampleMotion({instant:true});syncMotionUI();
   status("Lecture du test : inspecte les articulations pendant le mouvement.","success");
 });
 $("motionPause").addEventListener("click",()=>{
@@ -405,7 +420,7 @@ function loop(now){
         if($("motionLoop").checked)motion.time%=duration;
         else{motion.time=duration-1e-6;motion.playing=false;motion.previousFrame=null;}
       }
-      sampleMotion();
+      sampleMotion({dt});
     }
     motion.previousFrame=motion.playing?now:null;
   }
