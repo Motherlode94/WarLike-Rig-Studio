@@ -3,6 +3,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
 import {makeHumanoidPlan,weightsAt,inspectInput} from "./rig-core.mjs";
+import {smoothSkinWeights} from "./skin-smoothing.mjs";
 import {createRigEditor,rigGroup,RIG_COLORS} from "./rig-editor.mjs";
 import {RIG_TESTS,testAngles,diagnosticSummary} from "./rig-tester.mjs";
 import {inspectExistingSkeletons} from "./existing-rig.mjs";
@@ -233,7 +234,7 @@ function generateRig(){
   const target=new THREE.Group();target.name="WarLike_Rigged_Character";
   target.add(group);
   const skeleton=new THREE.Skeleton(bones);
-  let total=0,protectedVertices=0;
+  let total=0,protectedVertices=0,smoothedMeshes=0,unsmoothedMeshes=0;
   original.traverse(object=>{
     if(!object.isMesh)return;
     if(object.isSkinnedMesh)throw Error("Rig préexistant détecté : opération annulée.");
@@ -249,7 +250,12 @@ function generateRig(){
     }
     geo.setAttribute("skinIndex",new THREE.Uint16BufferAttribute(indices,4));
     geo.setAttribute("skinWeight",new THREE.Float32BufferAttribute(weights,4));
-    // Rigid head deformation and PBR textures retain the original vertex density.
+    const requestedSmooth=Math.min(3,Math.max(0,Number($("weightSmoothing").value)||0));
+    if(requestedSmooth){
+      const result=smoothSkinWeights(geo,plan,{iterations:requestedSmooth,lockHead:$("lockHead").checked});
+      if(result.applied)smoothedMeshes++;else unsmoothedMeshes++;
+    }
+    // Preserve original topology, materials and PBR textures.
     const mesh=new THREE.SkinnedMesh(geo,object.material);
     mesh.name=object.name||"WarLikeSkinnedMesh";
     mesh.frustumCulled=false;
@@ -282,7 +288,8 @@ function generateRig(){
   $("protectedCount").textContent=protectedVertices.toLocaleString("fr");
   $("vertexCount").textContent=total.toLocaleString("fr");
   frame(rigged);
-  status("Rig expérimental créé : "+bones.length+" os, "+protectedVertices+" sommets de tête verrouillés. Contrôle les déformations avant l'export.","success");
+  if(smoothedMeshes||unsmoothedMeshes)status("Skinning : "+smoothedMeshes+" maillage(s) lissé(s)"+(unsmoothedMeshes?" ; "+unsmoothedMeshes+" maillage(s) non lissé(s).":"")+". Vérifie les déformations avant l'export.","success");
+  else status("Rig expérimental créé : "+bones.length+" os, "+protectedVertices+" sommets de tête verrouillés. Contrôle les déformations avant l'export.","success");
 }
 function updateSelectedJoint(value){
   const label=$("selectedJoint"),inputs=[$("jointX"),$("jointY"),$("jointZ")];
