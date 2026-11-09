@@ -49,6 +49,7 @@
   choose(activePage);
   // Let model interaction start immediately after import; keep chosen section accessible.
   $("file")?.addEventListener("change", () => close());
+  $("motionPlay")?.addEventListener("click", () => close());
   // Named access for optional future toolbar actions.
   window.WarLikeRigMenu = Object.freeze({open,close,choose});
 })();
