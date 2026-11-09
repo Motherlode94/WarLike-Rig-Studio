@@ -1,10 +1,10 @@
 # WarLike Rig Studio
 
-**Prototype indépendant v0.6** pour préparer un rig humanoïde à partir d'un modèle GLB **riggé ou non riggé**, sans modifier son nombre de sommets ni réduire la définition de son visage. Développé pour l'écosystème WarLike, notamment WarLike Heart.
+**Prototype indépendant v0.7** pour préparer un rig humanoïde à partir d'un modèle GLB **riggé ou non riggé**, sans modifier son nombre de sommets ni réduire la définition de son visage. Développé pour l'écosystème WarLike, notamment WarLike Heart.
 
 ## Utilisation
 
-**Interface v0.6 :** la vue 3D occupe tout l'écran. Utiliser le bouton **☰ Outils** pour ouvrir le menu, puis choisir Importer, Squelette, Articulations, Animation, Export ou Diagnostics. Le panneau se ferme avec ✕, Échap ou un clic en dehors. Les options n'occupent plus l'écran en permanence.
+**Interface v0.7 :** la vue 3D occupe tout l'écran. Utiliser le bouton **☰ Outils** pour ouvrir le menu, puis choisir Importer, Squelette, Articulations, Animation, Export ou Diagnostics. Le panneau se ferme avec ✕, Échap ou un clic en dehors. Les options n'occupent plus l'écran en permanence.
 
 1. Ouvrir `index.html` dans un navigateur HTTPS (Cloudflare Pages ou équivalent) avec WebGL et accès au CDN Three.js. Le site est statique et ne nécessite aucun compte.
 2. Importer un GLB humanoïde debout, **Y vers le haut**. Un modèle **déjà riggé est reconnu** et ses poids, os, textures et animations existants sont conservés. Un modèle non riggé peut recevoir un nouveau squelette.
@@ -18,7 +18,7 @@ Les modèles sont lus **dans le navigateur**, sans envoi sur un serveur applicat
 
 - Import local d'un GLB et aperçu Three.js avec contrôles orbitaux.
 - Diagnostic des maillages, sommets, triangles, skins et morph targets.\n- **Prise en charge des GLB déjà riggés :** reconnaissance des SkinnedMesh, des squelettes et des noms d'os usuels Mixamo/Blender, inspection colorée des articulations en lecture seule, lecture des clips d'animation intégrés, et tests procéduraux compatibles avec les os identifiés. L'auto-rig ne remplace jamais les poids existants.\n- Export d'un GLB déjà riggé avec tentative de conservation de ses clips intégrés ; validation du round-trip requise.
-- Placement **heuristique** de 19 os humanoïdes et création d'une hiérarchie d'os.
+- Placement **heuristique** de 19 os humanoïdes et création d'une hiérarchie d'os. La position initiale des bras est configurable (bras le long du corps par défaut, A-pose ou T-pose) pour éviter d'éloigner artificiellement poignets et coudes du maillage.
 - Affectation automatique expérimentale de quatre influences maximum par sommet selon la position, sans décimation de géométrie.
 - **Protection de la tête** : les sommets situés dans la région supérieure sont liés rigidement à l'os Head. Cela vise à éviter les déformations faciales provoquées par un mauvais skinning, mais n'améliore pas la qualité géométrique du visage d'origine.
 - Placement interactif des articulations : points colorés, gizmo de déplacement, coordonnées X/Y/Z, symétrie et annulation (prototype à valider sur de vrais GLB).\n- **Tests de rig directement dans le navigateur :** 7 mouvements de diagnostic (respiration, bras et coudes, marche sur place, jambes, tête et cou, torse, séquence complète), lecture/pause, boucle, vitesse de 0,25× à 2×, amplitude 0 à 150 %, contrôle de fluidité 0 à 100 %, timeline et pose neutre. Les rotations procédurales utilisent une interpolation par quaternion pour limiter les mouvements brusques. Les rotations restent temporaires ; aucun changement des poids ou de la géométrie importés.\n- Pose simple de test et restauration de la pose neutre.
@@ -30,7 +30,7 @@ Les modèles sont lus **dans le navigateur**, sans envoi sur un serveur applicat
 
 **Prototype technique, pas un outil de rigging final ni une garantie d'animation correcte.** L'auto-placement repose sur des ratios corporels fixes, **pas sur une détection anatomique**. Le résultat dépend fortement de la pose, de l'orientation, des proportions et de la position du personnage. Les cheveux, vêtements et doigts peuvent mal se déformer ; il faut inspecter les épaules, coudes, hanches et genoux. Aucun contrôle visuel réel du rendu dans un navigateur ou test complet d'export-import n'est encore confirmé.
 
-- Les nouveaux rigs utilisent une pondération plus douce autour des articulations, mais **pas encore une véritable peinture des poids** ni une déformation anatomique avancée (twist bones, correctives, IK).\n- Les GLB déjà riggés gardent les poids d'origine : le réglage de fluidité n'améliore pas un skinning existant incorrect et ne remplace pas les clés de leur animation native.\n- Pas de peinture manuelle des poids ni IK d'édition ; le placement interactif des os reste expérimental.
+- Les nouveaux rigs utilisent une pondération plus douce autour des articulations, mais **pas encore une véritable peinture des poids** ni une déformation anatomique avancée (twist bones, correctives, IK).\n- Les GLB déjà riggés gardent les poids **et les positions des os d'origine**. Le choix de pose initiale concerne uniquement la création d'un **nouveau** rig. Si un os importé est déjà décentré, il faut corriger sa position de liaison et son skinning dans un outil adapté ; un simple décalage visuel des points ne le réparera pas.\n- Le réglage de fluidité n'améliore pas un skinning existant incorrect et ne remplace pas les clés de leur animation native.\n- Pas de peinture manuelle des poids ni IK d'édition ; le placement interactif des os reste expérimental.
 - Pas de poids automatiques fondés sur géodésiques ou diffusion volumique.
 - Pas de génération de blendshapes, d'expressions faciales, de mâchoire ni de visèmes.
 - Pas de retopologie, normal-map baking ni réduction des polygones : les modèles volumineux restent volumineux.
