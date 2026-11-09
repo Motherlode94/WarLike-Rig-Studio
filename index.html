@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0d1420">
+<title>WarLike Rig Studio · Prototype v0.1</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,system-ui,Segoe UI,sans-serif;background:#0c111b;color:#edf3f9}
+*{box-sizing:border-box}body{margin:0}button,input{font:inherit}button{border:1px solid #41546d;border-radius:11px;padding:10px 13px;background:#223148;color:#edf3f9;cursor:pointer}button:hover:not(:disabled){background:#304460}button:disabled{opacity:.4;cursor:not-allowed}button.primary{background:#8d4a78;border-color:#cc7eb3}button.primary:hover:not(:disabled){background:#ab588e}
+header{height:68px;border-bottom:1px solid #263548;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 22px;background:#111b2a}header .brand{display:flex;align-items:center;gap:11px;font-weight:800;letter-spacing:.03em}header .brand b{color:#ff91bf;font-size:24px}header small{color:#b4c0cc}
+main{display:grid;grid-template-columns:minmax(290px,340px) minmax(320px,1fr) minmax(270px,320px);gap:0;min-height:calc(100vh - 68px)}
+aside{padding:21px;border-right:1px solid #283548;background:#101926;display:flex;flex-direction:column;gap:18px}
+aside.right{border-right:0;border-left:1px solid #283548}
+h1{font-size:22px;margin:0 0 5px}h2{font-size:15px;color:#efc9dd;margin:0 0 12px}p{margin:0;line-height:1.55;color:#b6c1cf;font-size:13px}
+.panel{border:1px solid #293b50;padding:15px;border-radius:15px;background:#172231;display:grid;gap:12px}
+.controls{display:flex;flex-wrap:wrap;gap:8px}.controls button{flex:1}
+label.file{display:block;text-align:center;padding:16px;border:1px dashed #b77ca5;border-radius:12px;cursor:pointer;background:#2a253b;color:#f4d2e4;font-weight:650}
+label.file input{display:none}
+#stage{min-height:500px;position:relative;overflow:hidden;background:#121b28}canvas{display:block;width:100%;height:100%}
+.overlay{position:absolute;bottom:18px;left:18px;right:18px;pointer-events:none}.overlay>div{background:#0d1522dc;border:1px solid #52627b;border-radius:12px;padding:10px 13px;font-size:13px;color:#dce5ef;max-width:700px;line-height:1.5}
+#status[data-level=error]{border-color:#e46d87;color:#ffc3ce}#status[data-level=success]{border-color:#6ac3a9;color:#bbf4dd}
+label.toggle{display:flex;align-items:center;gap:9px;font-size:13px;color:#dae3ed}input[type=checkbox],input[type=radio]{accent-color:#f09ac8}
+#metrics{display:grid;gap:10px}#metrics>div{display:flex;justify-content:space-between;gap:14px;font-size:13px}#metrics span{color:#a5b5c8}#metrics strong{text-align:right}
+.value{color:#e9e5f6;font-weight:750}footer{font-size:12px;line-height:1.55;color:#a3b5ca}a{color:#e8a5d1}
+@media(max-width:1100px){main{grid-template-columns:270px minmax(320px,1fr)}aside.right{grid-column:1/-1;border-top:1px solid #283548;border-left:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start}}
+@media(max-width:720px){header{height:auto;align-items:start;flex-direction:column}main{display:flex;flex-direction:column}aside{border-right:0;padding:16px}aside.right{display:flex}#stage{height:60vh;min-height:390px;order:-1}}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"}}</script>
+</head>
+<body>
+<header><div class="brand"><b>♥</b><span>WARLIKE RIG STUDIO</span></div><small>Prototype v0.1 · Rigging expérimental sans décimation</small></header>
+<main>
+<aside aria-label="Outils de rigging">
+  <section><h1>Créer un rig</h1><p>Importe un personnage 3D vertical, non riggé et idéalement en A-pose. Le maillage et ses textures restent inchangés en densité.</p></section>
+  <section class="panel">
+    <h2>1 · Importer un modèle</h2>
+    <label class="file">Importer un GLB<input id="file" type="file" accept=".glb,model/gltf-binary" aria-label="Importer un fichier GLB"></label>
+    <p>GLB uniquement, 150 Mio maximum. Import local : pas de transfert serveur.</p>
+  </section>
+  <section class="panel">
+    <h2>2 · Générer un squelette</h2>
+    <label class="toggle"><input id="lockHead" type="checkbox" checked> Préserver rigidement la tête</label>
+    <p>Les sommets supérieurs de la tête sont affectés à l'os Head sans réduction de polygones. La jonction du cou nécessite une vérification.</p>
+    <button id="rig" class="primary" disabled>Créer le rig humanoïde</button>
+  </section>
+  <section class="panel">
+    <h2>3 · Contrôler la pose</h2>
+    <label class="toggle"><input type="checkbox" id="showBones" checked> Afficher les os</label>
+    <label class="toggle"><input type="radio" id="modeOriginal" name="view" checked disabled> Voir le modèle source</label>
+    <label class="toggle"><input type="radio" id="modeRigged" name="view" disabled> Voir le modèle riggé</label>
+    <div class="controls"><button id="testPose" disabled>Pose test</button><button id="resetPose" disabled>Repos</button></div>
+  </section>
+  <section class="panel">
+    <h2>4 · Exporter</h2>
+    <button id="save" disabled>Exporter GLB riggé</button>
+    <p>Le GLB exporté peut être importé dans WarLike Engine, après validation de son squelette et de ses textures.</p>
+  </section>
+</aside>
+<section id="stage" aria-label="Aperçu 3D interactif">
+  <canvas id="viewport" aria-label="Vue 3D du personnage"></canvas>
+  <div class="overlay"><div id="status" role="status" aria-live="polite">Importe un fichier GLB pour commencer. Souris : orbite. Molette : zoom.</div></div>
+</section>
+<aside class="right" aria-label="Diagnostics">
+  <section class="panel">
+    <h2>Diagnostic du modèle</h2>
+    <div id="metrics"><p>Aucun fichier chargé.</p></div>
+  </section>
+  <section class="panel">
+    <h2>Résultat du rig</h2>
+    <div id="metrics">
+    </div>
+    <p>Os générés : <strong class="value" id="boneCount">0</strong></p>
+    <p>Sommets verrouillés sur la tête : <strong class="value" id="protectedCount">0</strong></p>
+    <p>Sommets pondérés : <strong class="value" id="vertexCount">0</strong></p>
+  </section>
+  <section class="panel">
+    <h2>Limites actuelles</h2>
+    <p><strong>Ce prototype ne garantit pas un rig professionnel.</strong> Les os sont placés selon les proportions du modèle, et les poids sont approximatifs.</p>
+    <p>Aucune retopologie ou compression destructrice n'est réalisée. Cela préserve les détails existants, mais ne corrige pas un visage déjà mal reconstruit.</p>
+    <p>Les articulations des doigts, les corrections manuelles de poids, les expressions faciales, la mâchoire et les visèmes restent à développer.</p>
+  </section>
+  <footer>WarLike Rig Studio est autonome et ne modifie pas WarLike Engine. <a href="https://github.com/Motherlode94/WarLike-Rig-Studio">Code GitHub</a>.</footer>
+</aside>
+</main>
+<script type="module" src="./studio.js"></script>
+</body>
+</html>
