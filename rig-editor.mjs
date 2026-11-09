@@ -24,7 +24,7 @@ export function mirrorBoneName(name){
 }
 const numeric=v=>Math.round(v*10000)/10000;
 export function createRigEditor({scene,camera,renderer,orbit,boneRoot,rigMap,skeleton,skinnedMeshes,plan,onSelect,onChange,onNotice}){
-  let selected=null,active=false,mode="translate",destroyed=false;
+  let selected=null,active=false,destroyed=false;const history=[];\n  const snapshot=()=>new Map([...rigMap].map(([name,bone])=>[name,bone.position.clone()]));\n  const pushHistory=()=>{history.push(snapshot());if(history.length>30)history.shift();};
   const pivot=new THREE.Object3D();
   pivot.name="RigEditPivot";scene.add(pivot);
   const markerGroup=new THREE.Group();
@@ -113,7 +113,7 @@ export function createRigEditor({scene,camera,renderer,orbit,boneRoot,rigMap,ske
     if(result.length)select(result[0].object.userData.boneName);
   }
   function onDragging(event){orbit.enabled=!event.value;}
-  function onObjectChange(){
+  function onDragStart(){pushHistory();}\n  function onObjectChange(){
     if(!selected||!active)return;
     setRestWorldPosition(selected,pivot.position.clone());
     // Critical: the bind pose is recomputed while there is NO animation pose;
@@ -121,7 +121,7 @@ export function createRigEditor({scene,camera,renderer,orbit,boneRoot,rigMap,ske
   }
   renderer.domElement.addEventListener("pointerdown",onPointerDown);
   transform.addEventListener("dragging-changed",onDragging);
-  transform.addEventListener("objectChange",onObjectChange);
+  transform.addEventListener("objectChange",onObjectChange);\n  transform.addEventListener("mouseDown",onDragStart);
   function enable(flag){
     active=!!flag;markerGroup.visible=active;
     transform.visible=active&&!!selected;
@@ -133,7 +133,7 @@ export function createRigEditor({scene,camera,renderer,orbit,boneRoot,rigMap,ske
   function moveSelected(position){
     if(!selected)throw Error("Sélectionne d'abord un point coloré.");
     const target=new THREE.Vector3(...position.map(Number));
-    setRestWorldPosition(selected,target);refresh();
+    pushHistory();setRestWorldPosition(selected,target);refresh();
   }
   function mirrorSelected(){
     if(!selected)throw Error("Sélectionne d'abord un point.");
@@ -141,11 +141,11 @@ export function createRigEditor({scene,camera,renderer,orbit,boneRoot,rigMap,ske
     if(!other||!rigMap.has(other))throw Error("Pas de point symétrique pour cet os.");
     const position=worldPosition(rigMap.get(selected));
     position.x=2*plan.center[0]-position.x;
-    setRestWorldPosition(other,position);
+    pushHistory();setRestWorldPosition(other,position);
     select(other);
     onNotice("Point symétrique positionné : "+other);
   }
-  function reset(){
+  function undo(){\n    const state=history.pop();if(!state)return false;\n    for(const [name,position] of state)rigMap.get(name)?.position.copy(position);\n    updateSkin();refresh();if(selected)select(selected);return true;\n  }\n  function reset(){\n    pushHistory();
     for(const bone of rigMap.values())bone.quaternion.identity();
     // Restore original rest joint positions, top-down.
     for(const reference of plan.bones){
@@ -161,7 +161,7 @@ export function createRigEditor({scene,camera,renderer,orbit,boneRoot,rigMap,ske
   enable(false);
   refresh();
   return {
-    select,enable,refresh,moveSelected,mirrorSelected,reset,
+    select,enable,refresh,moveSelected,mirrorSelected,reset,undo,\n    get canUndo(){return history.length>0;},\n    setSnap(value){transform.setTranslationSnap(value||null);},
     get selected(){return selected;},
     get selectedPosition(){return selected?worldPosition(rigMap.get(selected)).toArray().map(numeric):null;},
     get colors(){return RIG_COLORS;},
@@ -169,7 +169,7 @@ export function createRigEditor({scene,camera,renderer,orbit,boneRoot,rigMap,ske
       destroyed=true;
       renderer.domElement.removeEventListener("pointerdown",onPointerDown);
       transform.removeEventListener("dragging-changed",onDragging);
-      transform.removeEventListener("objectChange",onObjectChange);
+      transform.removeEventListener("objectChange",onObjectChange);\n      transform.removeEventListener("mouseDown",onDragStart);
       transform.detach();scene.remove(transform);transform.dispose();
       scene.remove(markerGroup);scene.remove(pivot);
       sphere.dispose();for(const marker of hits)marker.material.dispose();
