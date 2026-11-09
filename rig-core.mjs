@@ -37,7 +37,7 @@ const distToSegment=(p,a,b)=>{
   return Math.hypot(...p.map((x,i)=>x-a[i]-d[i]*t));
 };
 // The source mesh positions remain unchanged. This experimental region-aware
-// weighting is an initial editable skin, NOT a production-quality autorigger.
+// weighting is an initial editable skin, NOT a production-quality autorigger.\n// A broader influence kernel reduces hard elbow/knee transitions; source topology is unchanged.
 export function weightsAt(point,plan,{lockHead=true}={}) {
   const [x,y,z]=point,[cx,cz]=plan.center,h=plan.height;
   const yn=(y-plan.min[1])/h,xn=(x-cx)/h;
@@ -53,7 +53,7 @@ export function weightsAt(point,plan,{lockHead=true}={}) {
   const pairs=names.map(name=>{
     const b=plan.bones[idx[name]],parent=plan.bones.find(v=>v.name===b.parent)||b;
     const distance=distToSegment(point,parent.position,b.position);
-    return {index:idx[name],score:1/Math.max(.025*h,distance)**3};
+    return {index:idx[name],score:1/Math.max(.055*h,distance)**1.6};
   }).sort((a,b)=>b.score-a.score).slice(0,4);
   const sum=pairs.reduce((s,a)=>s+a.score,0);
   const weights=pairs.map(a=>a.score/sum),indices=pairs.map(a=>a.index);
