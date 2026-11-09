@@ -1,8 +1,10 @@
+import {weightsAt} from "./rig-core.mjs";
 // WarLike skin-weight smoother: blend neighboring vertex weights only on the
 // same indexed mesh, without changing vertex positions or triangle topology.
 // Head-protected vertices remain rigid; original GLB is never mutated.
 export function smoothSkinWeights(geometry,plan,{iterations=2,lockHead=true,maxVertices=160000}={}){
- const positions=geometry.getAttribute("position"),skinIndex=geometry.getAttribute("skinIndex"),skinWeight=geometry.getAttribute("skinWeight"),index=geometry.index;
+ const positions=geometry.getAttribute("position"),index=geometry.index;
+ let skinIndex=geometry.getAttribute("skinIndex"),skinWeight=geometry.getAttribute("skinWeight");
  if(!index||!positions||!skinIndex||!skinWeight||positions.count>maxVertices||iterations<1)
    return {applied:false,reason:!index?"Maillage non indexé":positions?.count>maxVertices?"Maillage volumineux":"Données de skinning absentes"};
  const n=positions.count,adj=Array.from({length:n},()=>new Set());
@@ -40,9 +42,10 @@ export function smoothSkinWeights(geometry,plan,{iterations=2,lockHead=true,maxV
        weights[i*4+j]=(sorted[j]?.[1]||0)/sum;
      }
    }
-   geometry.setAttribute("skinIndex",new Uint16Array(indices).length?
-     new skinIndex.constructor(indices,4):skinIndex);
-   geometry.setAttribute("skinWeight",new skinWeight.constructor(weights,4));
+   skinIndex=new skinIndex.constructor(indices,4);
+   skinWeight=new skinWeight.constructor(weights,4);
+   geometry.setAttribute("skinIndex",skinIndex);
+   geometry.setAttribute("skinWeight",skinWeight);
  }
  return {applied:true,vertices:n,iterations:Math.min(4,Math.floor(iterations))};
 }
