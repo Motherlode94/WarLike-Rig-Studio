@@ -1,10 +1,10 @@
 # WarLike Rig Studio
 
-**Prototype indépendant v0.7** pour préparer un rig humanoïde à partir d'un modèle GLB **riggé ou non riggé**, sans modifier son nombre de sommets ni réduire la définition de son visage. Développé pour l'écosystème WarLike, notamment WarLike Heart.
+**Prototype indépendant v0.8** pour préparer un rig humanoïde à partir d'un modèle GLB **riggé ou non riggé**, sans modifier son nombre de sommets ni réduire la définition de son visage. Développé pour l'écosystème WarLike, notamment WarLike Heart.
 
 ## Utilisation
 
-**Interface v0.7 :** la vue 3D occupe tout l'écran. Utiliser le bouton **☰ Outils** pour ouvrir le menu, puis choisir Importer, Squelette, Articulations, Animation, Export ou Diagnostics. Le panneau se ferme avec ✕, Échap ou un clic en dehors. Les options n'occupent plus l'écran en permanence.
+**Interface v0.8 :** la vue 3D occupe tout l'écran. Utiliser le bouton **☰ Outils** pour ouvrir le menu, puis choisir Importer, Squelette, Articulations, Animation, Export ou Diagnostics. Le panneau se ferme avec ✕, Échap ou un clic en dehors. Les options n'occupent plus l'écran en permanence.
 
 1. Ouvrir `index.html` dans un navigateur HTTPS (Cloudflare Pages ou équivalent) avec WebGL et accès au CDN Three.js. Le site est statique et ne nécessite aucun compte.
 2. Importer un GLB humanoïde debout, **Y vers le haut**. Un modèle **déjà riggé est reconnu** et ses poids, os, textures et animations existants sont conservés. Un modèle non riggé peut recevoir un nouveau squelette.
@@ -30,7 +30,7 @@ Les modèles sont lus **dans le navigateur**, sans envoi sur un serveur applicat
 
 **Prototype technique, pas un outil de rigging final ni une garantie d'animation correcte.** L'auto-placement repose sur des ratios corporels fixes, **pas sur une détection anatomique**. Le résultat dépend fortement de la pose, de l'orientation, des proportions et de la position du personnage. Les cheveux, vêtements et doigts peuvent mal se déformer ; il faut inspecter les épaules, coudes, hanches et genoux. Aucun contrôle visuel réel du rendu dans un navigateur ou test complet d'export-import n'est encore confirmé.
 
-- Les nouveaux rigs utilisent une pondération plus douce autour des articulations, mais **pas encore une véritable peinture des poids** ni une déformation anatomique avancée (twist bones, correctives, IK).\n- Les GLB déjà riggés gardent les poids **et les positions des os d'origine**. Le choix de pose initiale concerne uniquement la création d'un **nouveau** rig. Si un os importé est déjà décentré, il faut corriger sa position de liaison et son skinning dans un outil adapté ; un simple décalage visuel des points ne le réparera pas.\n- Le réglage de fluidité n'améliore pas un skinning existant incorrect et ne remplace pas les clés de leur animation native.\n- Pas de peinture manuelle des poids ni IK d'édition ; le placement interactif des os reste expérimental.
+- Les rigs générés par WarLike utilisent désormais des influences de proximité sur les segments anatomiques : les poignets/manches ne sont plus attribués aux os des cuisses ou du bassin sur la pose bras le long du corps. Ce correctif réduit les étirements en tubes, mais **ne constitue pas un skinning anatomique professionnel** (peinture des poids, correctives, IK).\n- Les GLB déjà riggés gardent les poids **et les positions des os d'origine**. Le choix de pose initiale concerne uniquement la création d'un **nouveau** rig. Si un os importé est déjà décentré, il faut corriger sa position de liaison et son skinning dans un outil adapté ; un simple décalage visuel des points ne le réparera pas.\n- Le réglage de fluidité n'améliore pas un skinning existant incorrect et ne remplace pas les clés de leur animation native.\n- Pas de peinture manuelle des poids ni IK d'édition ; le placement interactif des os reste expérimental.
 - Pas de poids automatiques fondés sur géodésiques ou diffusion volumique.
 - Pas de génération de blendshapes, d'expressions faciales, de mâchoire ni de visèmes.
 - Pas de retopologie, normal-map baking ni réduction des polygones : les modèles volumineux restent volumineux.
@@ -55,3 +55,14 @@ Ce projet est volontairement distinct de [WarLike Engine](https://github.com/Mot
 ## Sécurité
 
 N'importer que des GLB de provenance fiable. Des fichiers 3D volumineux peuvent saturer le GPU ou la mémoire. Aucune donnée personnelle ni clé API ne doit être commitée dans ce dépôt.
+
+## Contrôle des manches étirées (v0.8)
+
+Si des tubes ou des morceaux de vêtement apparaissent sur les côtés :
+
+1. En mode source, vérifier si le défaut existe **avant** la création du rig.
+2. Si l'origine est intacte, réimporter le **GLB non riggé**, sélectionner la pose réelle des bras puis **recréer** le rig. Les poids des anciens GLB déjà exportés ne sont pas corrigés automatiquement.
+3. Tester Bras et coudes avec une amplitude faible (40–60 %), puis augmenter progressivement.
+4. Si le défaut existe déjà dans le GLB source ou un modèle déjà skinné, le nouveau calcul de poids ne s'applique pas à ce fichier : sa géométrie et ses influences doivent être inspectées séparément.
+
+Ce correctif a passé les tests automatisés de zones anatomiques ; la validation visuelle sur le modèle de WarLike Heart reste nécessaire.
