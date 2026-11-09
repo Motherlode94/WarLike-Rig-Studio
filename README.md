@@ -1,10 +1,10 @@
 # WarLike Rig Studio
 
-**Prototype indépendant v0.8** pour préparer un rig humanoïde à partir d'un modèle GLB **riggé ou non riggé**, sans modifier son nombre de sommets ni réduire la définition de son visage. Développé pour l'écosystème WarLike, notamment WarLike Heart.
+**Prototype indépendant v0.9** pour préparer un rig humanoïde à partir d'un modèle GLB **riggé ou non riggé**, sans modifier son nombre de sommets ni réduire la définition de son visage. Développé pour l'écosystème WarLike, notamment WarLike Heart.
 
 ## Utilisation
 
-**Interface v0.8 :** la vue 3D occupe tout l'écran. Utiliser le bouton **☰ Outils** pour ouvrir le menu, puis choisir Importer, Squelette, Articulations, Animation, Export ou Diagnostics. Le panneau se ferme avec ✕, Échap ou un clic en dehors. Les options n'occupent plus l'écran en permanence.
+**Interface v0.9 :** la vue 3D occupe tout l'écran. Utiliser le bouton **☰ Outils** pour ouvrir le menu, puis choisir Importer, Squelette, Articulations, Animation, Export ou Diagnostics. Le panneau se ferme avec ✕, Échap ou un clic en dehors. Les options n'occupent plus l'écran en permanence.
 
 1. Ouvrir `index.html` dans un navigateur HTTPS (Cloudflare Pages ou équivalent) avec WebGL et accès au CDN Three.js. Le site est statique et ne nécessite aucun compte.
 2. Importer un GLB humanoïde debout, **Y vers le haut**. Un modèle **déjà riggé est reconnu** et ses poids, os, textures et animations existants sont conservés. Un modèle non riggé peut recevoir un nouveau squelette.
@@ -56,7 +56,7 @@ Ce projet est volontairement distinct de [WarLike Engine](https://github.com/Mot
 
 N'importer que des GLB de provenance fiable. Des fichiers 3D volumineux peuvent saturer le GPU ou la mémoire. Aucune donnée personnelle ni clé API ne doit être commitée dans ce dépôt.
 
-## Contrôle des manches étirées (v0.8)
+## Contrôle des manches étirées (v0.9)
 
 Si des tubes ou des morceaux de vêtement apparaissent sur les côtés :
 
@@ -66,3 +66,11 @@ Si des tubes ou des morceaux de vêtement apparaissent sur les côtés :
 4. Si le défaut existe déjà dans le GLB source ou un modèle déjà skinné, le nouveau calcul de poids ne s'applique pas à ce fichier : sa géométrie et ses influences doivent être inspectées séparément.
 
 Ce correctif a passé les tests automatisés de zones anatomiques ; la validation visuelle sur le modèle de WarLike Heart reste nécessaire.
+
+## Réduction de l'étirement des vêtements (v0.9)
+
+Pour les **nouveaux rigs créés dans WarLike**, ouvrir **Outils → Squelette → Souplesse de la peau et des vêtements** puis choisir **Équilibré (2 passages)**, avant de cliquer sur **Créer le rig humanoïde**. L'algorithme lisse les poids de skinning entre les sommets connectés d'un même maillage et d'une même zone anatomique, sans modifier le maillage, les textures, les triangles ni les sommets du visage verrouillés sur Head. Une limite de 160 000 sommets par maillage évite un calcul trop lourd ; au-delà, le lissage est ignoré et indiqué dans le statut.
+
+**Limites :** le lissage atténue certaines cassures, mais ne garantit pas une peau naturelle : les hanches, les épaules, les vêtements amples et les cheveux nécessitent parfois une peinture manuelle des poids, des os correctifs ou une simulation des tissus. Les GLB **déjà riggés** gardent leurs poids et animations d'origine : leurs déformations ne seront pas réparées par ce réglage. Pour l'évaluer, importer un GLB non riggé, générer un nouveau rig, puis tester la marche de face et de profil, avant d'exporter.
+
+Tests : `node --test tests/skin-smoothing.test.mjs` et `node --test tests/rig-core.test.mjs`. Tests automatisés ≠ validation visuelle des déformations du personnage.
