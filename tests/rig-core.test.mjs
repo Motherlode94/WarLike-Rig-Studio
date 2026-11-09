@@ -52,3 +52,35 @@ test("arm posture keeps elbows and wrists close to actual arms-down body",()=>{
  assert.ok(Math.abs(joint(down,"LeftHand")[0]+joint(down,"RightHand")[0]-2*cx)<1e-8);
 });
 test("rejects unknown arm pose values",()=>assert.throws(()=>makeHumanoidPlan(box,{armPose:"unknown"})));
+
+test("arms-down wrists and sleeves never inherit leg or hip joints",()=>{
+ const plan=makeHumanoidPlan(box,{armPose:"down"});
+ const names=plan.bones.map(b=>b.name);
+ for(const x of [-.355,.355]){
+   for(const y of [.66,.59,.48,.43]){
+     const w=weightsAt([x,y,0],plan);
+     assert.ok(w.zone.startsWith("arm"),"arm zone at x="+x+" y="+y+" got "+w.zone);
+     for(let j=0;j<4;j++)if(w.weights[j]>1e-8)
+       assert.match(names[w.indices[j]],/Shoulder|Arm|Hand/,"arm vertex influenced by "+names[w.indices[j]]);
+   }
+ }
+});
+test("leg vertices stay on leg or pelvis, not arm joints",()=>{
+ const plan=makeHumanoidPlan(box,{armPose:"down"});
+ const names=plan.bones.map(b=>b.name);
+ for(const y of [.35,.55]){
+   const w=weightsAt([.16,y,0],plan);
+   assert.ok(w.zone.startsWith("leg"),"leg region expected at "+y);
+   for(let j=0;j<4;j++)if(w.weights[j]>1e-8)
+     assert.match(names[w.indices[j]],/Leg|Foot|Hips/);
+ }
+});
+test("point weights remain normalized at shoulders, hips and elbows",()=>{
+ const plan=makeHumanoidPlan(box,{armPose:"down"});
+ for(const name of ["LeftUpperArm","LeftLowerArm","RightHand","LeftUpperLeg","RightLowerLeg","Chest"]){
+   const point=plan.bones.find(b=>b.name===name).position;
+   const w=weightsAt(point,plan);
+   assert.ok(Math.abs(w.weights.reduce((a,b)=>a+b,0)-1)<1e-8);
+   assert.ok(w.weights.every(n=>n>=0&&Number.isFinite(n)));
+ }
+});
