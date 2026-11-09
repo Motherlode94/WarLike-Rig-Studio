@@ -7,7 +7,7 @@ export const HUMAN_BONE_NAMES = Object.freeze([
   "RightUpperLeg","RightLowerLeg","RightFoot"
 ]);
 
-export function makeHumanoidPlan(box) {
+export function makeHumanoidPlan(box,{armPose="down"}={}) {
   const min=box?.min, max=box?.max;
   if(!min||!max||![min.x,min.y,min.z,max.x,max.y,max.z].every(Number.isFinite))
     throw Error("Bornes 3D invalides.");
@@ -15,20 +15,24 @@ export function makeHumanoidPlan(box) {
   if(h<=0.01)throw Error("Le personnage doit être vertical (axe Y positif).");
   const cx=(min.x+max.x)/2,cz=(min.z+max.z)/2;
   const p=(x,y,z=0)=>[cx+x*h,min.y+y*h,cz+z*h];
+  if(!["down","a","t"].includes(armPose))throw Error("Pose de bras inconnue.");
+  // Arm landmarks must match the input geometry, not a generic horizontal T-pose.
+  const poses={down:{elbowX:.185,elbowY:.635,handX:.195,handY:.51,upperX:.162,upperY:.744},a:{elbowX:.255,elbowY:.685,handX:.31,handY:.575,upperX:.188,upperY:.753},t:{elbowX:.315,elbowY:.785,handX:.43,handY:.785,upperX:.19,upperY:.783}};
+  const arm=poses[armPose];
   const bones=[
     ["Hips",null,p(0,.52)],["Spine","Hips",p(0,.64)],["Chest","Spine",p(0,.76)],
     ["Neck","Chest",p(0,.855)],["Head","Neck",p(0,.94)],
-    ["LeftShoulder","Chest",p(.115,.775)],["LeftUpperArm","LeftShoulder",p(.19,.755)],
-    ["LeftLowerArm","LeftUpperArm",p(.30,.645)],["LeftHand","LeftLowerArm",p(.36,.53)],
-    ["RightShoulder","Chest",p(-.115,.775)],["RightUpperArm","RightShoulder",p(-.19,.755)],
-    ["RightLowerArm","RightUpperArm",p(-.30,.645)],["RightHand","RightLowerArm",p(-.36,.53)],
+    ["LeftShoulder","Chest",p(.125,.775)],["LeftUpperArm","LeftShoulder",p(arm.upperX,arm.upperY)],
+    ["LeftLowerArm","LeftUpperArm",p(arm.elbowX,arm.elbowY)],["LeftHand","LeftLowerArm",p(arm.handX,arm.handY)],
+    ["RightShoulder","Chest",p(-.125,.775)],["RightUpperArm","RightShoulder",p(-arm.upperX,arm.upperY)],
+    ["RightLowerArm","RightUpperArm",p(-arm.elbowX,arm.elbowY)],["RightHand","RightLowerArm",p(-arm.handX,arm.handY)],
     ["LeftUpperLeg","Hips",p(.087,.48)],["LeftLowerLeg","LeftUpperLeg",p(.09,.285)],
     ["LeftFoot","LeftLowerLeg",p(.09,.055,.035)],
     ["RightUpperLeg","Hips",p(-.087,.48)],["RightLowerLeg","RightUpperLeg",p(-.09,.285)],
     ["RightFoot","RightLowerLeg",p(-.09,.055,.035)]
   ];
   return {bones:bones.map(([name,parent,position])=>({name,parent,position})),
-    min:[min.x,min.y,min.z],max:[max.x,max.y,max.z],height:h,center:[cx,cz]};
+    min:[min.x,min.y,min.z],max:[max.x,max.y,max.z],height:h,center:[cx,cz],armPose};
 }
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const distToSegment=(p,a,b)=>{
