@@ -23,7 +23,7 @@ export function mirrorBoneName(name){
   return null;
 }
 const numeric=v=>Math.round(v*10000)/10000;
-export function createRigEditor({scene,camera,renderer,orbit,rigGroup,rigMap,skeleton,skinnedMeshes,plan,onSelect,onChange,onNotice}){
+export function createRigEditor({scene,camera,renderer,orbit,boneRoot,rigMap,skeleton,skinnedMeshes,plan,onSelect,onChange,onNotice}){
   let selected=null,active=false,mode="translate",destroyed=false;
   const pivot=new THREE.Object3D();
   pivot.name="RigEditPivot";scene.add(pivot);
@@ -65,12 +65,12 @@ export function createRigEditor({scene,camera,renderer,orbit,rigGroup,rigMap,ske
   }
   function refresh(){
     if(destroyed)return;
-    rigGroup.updateMatrixWorld(true);
+    boneRoot.updateMatrixWorld(true);
     for(const [name,bone] of rigMap)byName.get(name).position.copy(worldPosition(bone));
     if(selected&&!transform.dragging)pivot.position.copy(worldPosition(rigMap.get(selected)));
   }
   function updateSkin(){
-    rigGroup.updateMatrixWorld(true);
+    boneRoot.updateMatrixWorld(true);
     skeleton.calculateInverses();
     skeleton.update();
     for(const mesh of skinnedMeshes){mesh.skeleton=skeleton;mesh.updateMatrixWorld(true);}
@@ -78,7 +78,7 @@ export function createRigEditor({scene,camera,renderer,orbit,rigGroup,rigMap,ske
   function setRestWorldPosition(name,target){
     const bone=rigMap.get(name);if(!bone)throw Error("Articulation absente : "+name);
     if(![target.x,target.y,target.z].every(Number.isFinite))throw Error("Coordonnées invalides.");
-    rigGroup.updateMatrixWorld(true);
+    boneRoot.updateMatrixWorld(true);
     const children=bone.children.filter(child=>child.isBone);
     childPositions.length=0;
     for(const child of children)childPositions.push([child,worldPosition(child)]);
@@ -86,7 +86,7 @@ export function createRigEditor({scene,camera,renderer,orbit,rigGroup,rigMap,ske
     if(!parent)throw Error("L'os n'a pas de parent.");
     parent.updateWorldMatrix(true,false);
     bone.position.copy(parent.worldToLocal(target.clone()));
-    rigGroup.updateMatrixWorld(true);
+    boneRoot.updateMatrixWorld(true);
     for(const [child,position] of childPositions){
       child.position.copy(bone.worldToLocal(position.clone()));
     }
@@ -153,7 +153,7 @@ export function createRigEditor({scene,camera,renderer,orbit,rigGroup,rigMap,ske
       const parent=bone.parent;
       parent.updateWorldMatrix(true,false);
       bone.position.copy(parent.worldToLocal(new THREE.Vector3(...reference.position)));
-      rigGroup.updateMatrixWorld(true);
+      boneRoot.updateMatrixWorld(true);
     }
     updateSkin();refresh();
     if(selected)select(selected);
