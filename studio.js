@@ -3,6 +3,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
 import {makeHumanoidPlan,weightsAt,inspectInput} from "./rig-core.mjs";
+import {createRigEditor,rigGroup,RIG_COLORS} from "./rig-editor.mjs";
 
 const $=id=>document.getElementById(id), status=(message,level="info")=>{
   $("status").textContent=message;$("status").dataset.level=level;
@@ -24,6 +25,7 @@ controls.enableDamping=true;controls.dampingFactor=.07;
 const loader=new GLTFLoader(),exporter=new GLTFExporter();
 let original=null,rigged=null,helpers=null,sourceName="",modelInfo=null,rigMap=null,rigPose=null;
 let pending=false,sourceBlobUrl=null,originalIsRigged=false;
+let editor=null,poseActive=false;
 function setBusy(value){pending=value;for(const id of ["file","rig","save","resetPose","testPose"])$(id).disabled=value;}
 function frame(object){
   object.updateMatrixWorld(true);
@@ -62,6 +64,7 @@ function setMode(mode){
   if(original)original.visible=mode==="original";
   if(rigged)rigged.visible=mode==="rigged";
   if(helpers)helpers.visible=mode==="rigged"&&$("showBones").checked;
+  editor?.enable(mode==="rigged"&&$("editJoints").checked&&!poseActive);
   $("modeOriginal").disabled=!original;
   $("modeRigged").disabled=!rigged;
 }
@@ -75,8 +78,11 @@ async function load(file){
     const next=gltf.scene;
     const info=inspect(next);
     if(!info.meshCount)throw Error("Le GLB ne contient aucun maillage.");
+    editor?.dispose();editor=null;poseActive=false;
     disposeHelpers();clearObject(original);clearObject(rigged);
     original=next;rigged=null;rigMap=null;modelInfo=info;rigPose=null;
+    $("jointSelect").replaceChildren(new Option("Aucune articulation",""));
+    $("jointSelect").disabled=true;updateSelectedJoint(null);
     scene.add(original);original.visible=true;
     sourceName=file.name.replace(/\.glb$/i,"");sourceName=sourceName.slice(0,96);
     originalIsRigged=info.alreadyRigged;
@@ -149,12 +155,24 @@ function generateRig(){
     target.add(mesh);total+=positions.count;
   });
   if(!total)throw Error("Aucun sommet utilisable.");
+  editor?.dispose();editor=null;poseActive=false;
   disposeHelpers();clearObject(rigged);
   rigged=target;scene.add(rigged);
   rigMap=map;rigPose=new Map([...map].map(([name,b])=>[name,b.quaternion.clone()]));
   const debug=new THREE.SkeletonHelper(group);
   debug.material.depthTest=false;debug.material.transparent=true;debug.material.opacity=.95;
   debug.name="SkeletonPreview";scene.add(debug);helpers=debug;
+  editor=createRigEditor({
+    scene,camera,renderer,orbit:controls,boneRoot:group,rigMap:map,
+    skeleton,skinnedMeshes:target.children.filter(o=>o.isSkinnedMesh),plan,
+    onSelect:({name,category,position})=>updateSelectedJoint({name,category,position}),
+    onChange:(name,position)=>updateSelectedJoint({name,category:rigGroup(name),position}),
+    onNotice:message=>status(message)
+  });
+  $("jointSelect").replaceChildren(...plan.bones.map(({name})=>new Option(name,name)));
+  $("jointSelect").disabled=false;
+  editor.select("Hips");
+  editor.setSnap(Number($("snap").value)||null);
   $("modeRigged").checked=true;setMode("rigged");
   $("save").disabled=false;$("testPose").disabled=false;$("resetPose").disabled=false;
   $("boneCount").textContent=String(bones.length);
@@ -163,9 +181,22 @@ function generateRig(){
   frame(rigged);
   status("Rig expérimental créé : "+bones.length+" os, "+protectedVertices+" sommets de tête verrouillés. Contrôle les déformations avant l'export.","success");
 }
+function updateSelectedJoint(value){
+  const label=$("selectedJoint"),inputs=[$("jointX"),$("jointY"),$("jointZ")];
+  if(!value){label.textContent="Sélectionne un point coloré";label.style.color="";
+    for(const control of inputs){control.value="";control.disabled=true;}
+    $("mirrorJoint").disabled=true;return;}
+  const {name,category,position}=value;
+  label.textContent=name+" · "+category;label.style.color=RIG_COLORS[category];
+  $("jointSelect").value=name;
+  for(let i=0;i<3;i++){inputs[i].disabled=false;inputs[i].value=Number(position[i]).toFixed(4);}
+  $("mirrorJoint").disabled=!/^Left|^Right/.test(name);
+}
 function resetPose(){
   if(!rigMap)return;
   for(const [name,b] of rigMap)b.quaternion.copy(rigPose.get(name));
+  poseActive=false;
+  setMode($("modeRigged").checked?"rigged":"original");
   status("Pose de repos restaurée.");
 }
 function demoPose(){
@@ -176,7 +207,8 @@ function demoPose(){
   rotate("LeftLowerArm",0,0,-.15);
   rotate("RightLowerArm",0,0,.15);
   rotate("Head",.07,0,.08);
-  status("Pose de test appliquée. Inspecte les épaules, les coudes, le cou et les lèvres.");
+  poseActive=true;setMode("rigged");
+  status("Pose de test appliquée. Clique sur Repos avant de déplacer les articulations.");
 }
 async function save(){
   if(!rigged)throw Error("Aucun rig à exporter.");
@@ -207,6 +239,37 @@ $("save").addEventListener("click",async()=>{
 $("resetPose").addEventListener("click",resetPose);
 $("testPose").addEventListener("click",demoPose);
 $("showBones").addEventListener("change",()=>setMode($("modeRigged").checked?"rigged":"original"));
+$("editJoints").addEventListener("change",()=>setMode($("modeRigged").checked?"rigged":"original"));
+$("jointSelect").addEventListener("change",event=>editor?.select(event.target.value));
+$("snap").addEventListener("change",event=>editor?.setSnap(Number(event.target.value)||null));
+$("applyJoint").addEventListener("click",()=>{
+  if(!editor)return;
+  try{
+    if(poseActive)resetPose();
+    editor.moveSelected([Number($("jointX").value),Number($("jointY").value),Number($("jointZ").value)]);
+    status("Articulation déplacée, pose de référence recalculée sans décimation.","success");
+  }catch(error){status(error.message,"error");}
+});
+$("mirrorJoint").addEventListener("click",()=>{
+  try{if(poseActive)resetPose();editor?.mirrorSelected();}
+  catch(error){status(error.message,"error");}
+});
+$("undoJoint").addEventListener("click",()=>{
+  if(!editor)return;
+  if(poseActive)resetPose();
+  if(editor.undo())status("Dernier déplacement annulé.");else status("Aucune modification à annuler.");
+});
+$("resetJoints").addEventListener("click",()=>{
+  if(!editor)return;
+  if(poseActive)resetPose();
+  editor.reset();status("Tous les points sont revenus à leur position initiale.");
+});
+window.addEventListener("keydown",event=>{
+  if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="z"&&editor&&
+     !["INPUT","SELECT","TEXTAREA"].includes(document.activeElement?.tagName)){
+    event.preventDefault();if(poseActive)resetPose();editor.undo();
+  }
+});
 $("modeOriginal").addEventListener("change",()=>setMode("original"));
 $("modeRigged").addEventListener("change",()=>setMode("rigged"));
 function resize(){
