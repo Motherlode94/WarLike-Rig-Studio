@@ -1,0 +1,24 @@
+/* WarLike Rig Studio — adopt the official WarLike palette without changing its layout */
+:root{--wl-forest:#37463D;--wl-slate:#5B696B;--wl-graphite:#535953;--wl-ivory:#F8FBF1;--wl-sage:#C5C5A9;
+--wl-bg:#17211B;--wl-surface:#233027;--wl-text:#F8FBF1;--wl-border:#596A5C;--wl-focus:#C5C5A9}
+:root{color-scheme:dark;background:var(--wl-bg);color:var(--wl-text)}
+body{background:var(--wl-bg);color:var(--wl-text)}
+header,#toolsDrawer{background:var(--wl-bg);border-color:var(--wl-border)}
+header .brand b{color:var(--wl-sage)}
+header small,p,footer{color:#D4DCCA}
+h2{color:var(--wl-sage)}
+.panel{background:var(--wl-surface);border-color:var(--wl-border)}
+button{background:var(--wl-forest);border-color:var(--wl-slate);color:var(--wl-ivory)}
+button:hover:not(:disabled){background:var(--wl-slate);border-color:var(--wl-sage)}
+button.primary{background:var(--wl-sage);border-color:var(--wl-sage);color:#17211B}
+button.primary:hover:not(:disabled){background:var(--wl-ivory);color:#17211B}
+#toolsNav button{background:var(--wl-forest);border-color:var(--wl-slate)}
+#toolsNav button.active{background:var(--wl-sage);border-color:var(--wl-sage);color:#17211B}
+#stage{background:#17211B}
+.overlay>div{background:#233027E8;border-color:var(--wl-border);color:var(--wl-ivory)}
+label.file{background:var(--wl-forest);border-color:var(--wl-sage);color:var(--wl-ivory)}
+select,.coordinates input{background:#17211B;border-color:var(--wl-border);color:var(--wl-ivory)}
+label.toggle,.joint-legend span,#metrics span{color:#D4DCCA}
+.value,#selectedJoint{color:var(--wl-sage)}
+a{color:var(--wl-sage)}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--wl-focus);outline-offset:2px}
