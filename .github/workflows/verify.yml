@@ -31,5 +31,6 @@ jobs:
           grep -q 'id="mirrorJoint"' index.html
           grep -q 'id="motionPlay"' index.html
           grep -q 'id="motionTime"' index.html
+          grep -q 'id="motionSmoothness"' index.html
           grep -q 'id="menuToggle"' index.html
           grep -q 'data-page-target="joints"' index.html
