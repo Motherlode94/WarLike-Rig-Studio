@@ -29,7 +29,7 @@ export function normalizeImportedBoneName(name){
  let value=String(name||"").toLowerCase().trim();
  // Prefixes separated by ':' or '|' in Blender/Mixamo exports.
  value=value.split(/[:|]/).at(-1);
- value=value.replace(/^(?:mixamorig|armature|skeleton|rig|bip001)[_\s.:-]*/g,"");
+ value=value.replace(/^(?:mixamorig|armature|skeleton|rig|bip001)(?:[_\\s.:-]+|$)/,"");
  return value.replace(/[^a-z0-9]/g,"");
 }
 export function mapImportedBones(bones){
