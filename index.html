@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0d1420">
-<title>WarLike Rig Studio · Prototype v0.2</title>
+<title>WarLike Rig Studio · Prototype v0.3</title>
 <style>
 :root{color-scheme:dark;font-family:Inter,system-ui,Segoe UI,sans-serif;background:#0c111b;color:#edf3f9}
 *{box-sizing:border-box}body{margin:0}button,input{font:inherit}button{border:1px solid #41546d;border-radius:11px;padding:10px 13px;background:#223148;color:#edf3f9;cursor:pointer}button:hover:not(:disabled){background:#304460}button:disabled{opacity:.4;cursor:not-allowed}button.primary{background:#8d4a78;border-color:#cc7eb3}button.primary:hover:not(:disabled){background:#ab588e}
@@ -34,26 +34,70 @@ label.toggle{display:flex;align-items:center;gap:9px;font-size:13px;color:#dae3e
 select{width:100%;background:#111b2c;color:#f5f8ff;border:1px solid #50627c;border-radius:8px;padding:10px}
 #selectedJoint{font-weight:750;color:#f5c0dc}
 @media(max-width:720px){.joint-legend{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Drawer navigation keeps the whole model viewport unobstructed by default. */
+body{overflow-x:hidden}
+header{position:relative;z-index:3}
+#menuToggle{white-space:nowrap;background:#283449;border-color:#556781}
+main{display:block;height:calc(100vh - 68px);min-height:460px;position:relative}
+#stage{width:100%;height:100%;min-height:0}
+#toolsDrawer{position:fixed;top:68px;left:0;bottom:0;width:min(405px,94vw);z-index:12;
+ display:flex;flex-direction:column;gap:12px;overflow-y:auto;padding:18px 18px 28px;
+ background:#121d2c;box-shadow:18px 0 50px #0008;border-right:1px solid #52627a;
+ transform:translateX(-110%);visibility:hidden;pointer-events:none;transition:transform .2s ease,visibility .2s}
+body.tools-open #toolsDrawer{transform:translateX(0);visibility:visible;pointer-events:auto}
+#drawerBackdrop:not([hidden]){position:fixed;inset:68px 0 0;z-index:10;background:#050b16a8}
+.drawer-heading{display:flex;justify-content:space-between;align-items:center;font-size:16px}
+.drawer-heading button{padding:6px 10px}
+#toolsNav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;flex-shrink:0}
+#toolsNav button{font-size:12px;min-width:0;padding:10px 5px;border-color:#334860}
+#toolsNav button.active{background:#684262;border-color:#e0a1cc;color:white}
+#toolsDrawer .tool-page{display:none}
+#toolsDrawer .tool-page.active{display:grid}
+#toolsDrawer .tool-page:not(.panel){gap:10px}
+#toolsDrawer [data-page="import"].panel{margin-top:-6px}
+.diagnostics-page{gap:12px}
+.diagnostics-page>.panel{border:1px solid #293b50}
+#toolsDrawer .panel{width:100%}
+@media(max-width:720px){
+ header{height:60px;flex-direction:row;align-items:center;padding:9px 12px}
+ header small{display:none}header .brand{font-size:12px}
+ main{height:calc(100dvh - 60px);min-height:360px;display:block}
+ #stage{height:100%;min-height:0;order:initial}
+ #toolsDrawer{top:60px;padding:14px}
+ #drawerBackdrop:not([hidden]){inset:60px 0 0}
+}
+@media(prefers-reduced-motion:reduce){#toolsDrawer{transition:none}}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"}}</script>
 </head>
 <body>
-<header><div class="brand"><b>♥</b><span>WARLIKE RIG STUDIO</span></div><small>Prototype v0.2 · Articulations éditables</small></header>
+<header><div class="brand"><button id="menuToggle" type="button" aria-controls="toolsDrawer" aria-expanded="false" aria-label="Ouvrir le menu des outils" title="Menu des outils">☰ Outils</button><b>♥</b><span>WARLIKE RIG STUDIO</span></div><small>Prototype v0.3 · Interface à menus</small></header>
+<div id="drawerBackdrop" hidden></div>
 <main>
-<aside aria-label="Outils de rigging">
-  <section><h1>Créer un rig</h1><p>Importe un personnage 3D vertical, non riggé et idéalement en A-pose. Le maillage et ses textures restent inchangés en densité.</p></section>
-  <section class="panel">
+<aside id="toolsDrawer" aria-label="Menu des outils de rigging" tabindex="-1">
+  <div class="drawer-heading"><strong>Outils de rigging</strong><button id="closeTools" type="button" aria-label="Fermer le menu">✕</button></div>
+  <nav id="toolsNav" aria-label="Catégories d'outils">
+    <button type="button" data-page-target="import" class="active">📦 Importer</button>
+    <button type="button" data-page-target="skeleton">🦴 Squelette</button>
+    <button type="button" data-page-target="joints">🎯 Articulations</button>
+    <button type="button" data-page-target="animation">▶ Animation</button>
+    <button type="button" data-page-target="export">💾 Export</button>
+    <button type="button" data-page-target="diagnostics">📊 Diagnostics</button>
+  </nav>
+  <section class="tool-page" data-page="import"><h1>Importer un personnage</h1><p>Importe un personnage 3D vertical, non riggé et idéalement en A-pose. Le maillage et ses textures restent inchangés en densité.</p></section>
+  <section class="panel tool-page" data-page="import">
     <h2>1 · Importer un modèle</h2>
     <label class="file">Importer un GLB<input id="file" type="file" accept=".glb,model/gltf-binary" aria-label="Importer un fichier GLB"></label>
     <p>GLB uniquement, 150 Mio maximum. Import local : pas de transfert serveur.</p>
   </section>
-  <section class="panel">
+  <section class="panel tool-page" data-page="skeleton">
     <h2>2 · Générer un squelette</h2>
     <label class="toggle"><input id="lockHead" type="checkbox" checked> Préserver rigidement la tête</label>
     <p>Les sommets supérieurs de la tête sont affectés à l'os Head sans réduction de polygones. La jonction du cou nécessite une vérification.</p>
     <button id="rig" class="primary" disabled>Créer le rig humanoïde</button>
   </section>
-  <section class="panel">
+  <section class="panel tool-page" data-page="animation">
     <h2>3 · Contrôler la pose</h2>
     <label class="toggle"><input type="checkbox" id="showBones" checked> Afficher les os</label>
     <label class="toggle"><input type="radio" id="modeOriginal" name="view" checked disabled> Voir le modèle source</label>
@@ -61,7 +105,7 @@ select{width:100%;background:#111b2c;color:#f5f8ff;border:1px solid #50627c;bord
     <div class="controls"><button id="testPose" disabled>Pose test</button><button id="resetPose" disabled>Repos</button></div>
   </section>
 
-  <section class="panel">
+  <section class="panel tool-page" data-page="joints">
     <h2>4 · Éditer les articulations</h2>
     <label class="toggle"><input type="checkbox" id="editJoints" checked> Points colorés et gizmo de déplacement</label>
     <div class="joint-legend" aria-label="Légende des couleurs">
@@ -97,17 +141,12 @@ select{width:100%;background:#111b2c;color:#f5f8ff;border:1px solid #50627c;bord
     </div>
     <button id="resetJoints">Réinitialiser tous les points</button>
   </section>
-  <section class="panel">
+  <section class="panel tool-page" data-page="export">
     <h2>5 · Exporter</h2>
     <button id="save" disabled>Exporter GLB riggé</button>
     <p>Le GLB exporté peut être importé dans WarLike Engine, après validation de son squelette et de ses textures.</p>
   </section>
-</aside>
-<section id="stage" aria-label="Aperçu 3D interactif">
-  <canvas id="viewport" aria-label="Vue 3D du personnage"></canvas>
-  <div class="overlay"><div id="status" role="status" aria-live="polite">Importe un fichier GLB pour commencer. Souris : orbite. Molette : zoom.</div></div>
-</section>
-<aside class="right" aria-label="Diagnostics">
+<section class="tool-page diagnostics-page" data-page="diagnostics">
   <section class="panel">
     <h2>Diagnostic du modèle</h2>
     <div id="metrics"><p>Aucun fichier chargé.</p></div>
@@ -125,8 +164,15 @@ select{width:100%;background:#111b2c;color:#f5f8ff;border:1px solid #50627c;bord
     <p>Le placement des os peut être corrigé manuellement, mais la peinture des poids, les doigts, les expressions faciales, la mâchoire et les visèmes restent à développer.</p>
   </section>
   <footer>WarLike Rig Studio est autonome et ne modifie pas WarLike Engine. <a href="https://github.com/Motherlode94/WarLike-Rig-Studio">Code GitHub</a>.</footer>
+</section>
 </aside>
+<section id="stage" aria-label="Aperçu 3D interactif">
+  <canvas id="viewport" aria-label="Vue 3D du personnage"></canvas>
+  <div class="overlay"><div id="status" role="status" aria-live="polite">Importe un fichier GLB pour commencer. Souris : orbite. Molette : zoom.</div></div>
+</section>
+
 </main>
+<script src="./menu.js" defer></script>
 <script type="module" src="./studio.js"></script>
 </body>
 </html>
