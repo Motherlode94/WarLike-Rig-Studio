@@ -15,6 +15,7 @@ jobs:
           node --check studio.js
           node --check rig-core.mjs
           node --check rig-editor.mjs
+          node --check menu.js
       - name: Automated rig tests
         run: node --test tests/*.test.mjs
       - name: Verify app files
@@ -27,3 +28,5 @@ jobs:
           grep -q 'id="jointSelect"' index.html
           grep -q 'id="jointX"' index.html
           grep -q 'id="mirrorJoint"' index.html
+          grep -q 'id="menuToggle"' index.html
+          grep -q 'data-page-target="joints"' index.html
