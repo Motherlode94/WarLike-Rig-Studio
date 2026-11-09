@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0d1420">
-<title>WarLike Rig Studio · Prototype v0.6</title>
+<title>WarLike Rig Studio · Prototype v0.7</title>
 <style>
 :root{color-scheme:dark;font-family:Inter,system-ui,Segoe UI,sans-serif;background:#0c111b;color:#edf3f9}
 *{box-sizing:border-box}body{margin:0}button,input{font:inherit}button{border:1px solid #41546d;border-radius:11px;padding:10px 13px;background:#223148;color:#edf3f9;cursor:pointer}button:hover:not(:disabled){background:#304460}button:disabled{opacity:.4;cursor:not-allowed}button.primary{background:#8d4a78;border-color:#cc7eb3}button.primary:hover:not(:disabled){background:#ab588e}
@@ -80,7 +80,7 @@ body.tools-open #toolsDrawer{transform:translateX(0);visibility:visible;pointer-
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"}}</script>
 </head>
 <body>
-<header><div class="brand"><button id="menuToggle" type="button" aria-controls="toolsDrawer" aria-expanded="false" aria-label="Ouvrir le menu des outils" title="Menu des outils">☰ Outils</button><b>♥</b><span>WARLIKE RIG STUDIO</span></div><small>Prototype v0.6 · Test de rig intégré</small></header>
+<header><div class="brand"><button id="menuToggle" type="button" aria-controls="toolsDrawer" aria-expanded="false" aria-label="Ouvrir le menu des outils" title="Menu des outils">☰ Outils</button><b>♥</b><span>WARLIKE RIG STUDIO</span></div><small>Prototype v0.7 · Test de rig intégré</small></header>
 <div id="drawerBackdrop" hidden></div>
 <main>
 <aside id="toolsDrawer" aria-label="Menu des outils de rigging" tabindex="-1">
@@ -103,6 +103,13 @@ body.tools-open #toolsDrawer{transform:translateX(0);visibility:visible;pointer-
     <h2>2 · Générer un squelette</h2>
     <label class="toggle"><input id="lockHead" type="checkbox" checked> Préserver rigidement la tête</label>
     <p>Les sommets supérieurs de la tête sont affectés à l'os Head sans réduction de polygones. La jonction du cou nécessite une vérification.</p>
+    <label for="armPose">Position des bras sur le modèle</label>
+    <select id="armPose" aria-label="Position initiale des bras">
+      <option value="down">Bras le long du corps (recommandé)</option>
+      <option value="a">A-pose : bras légèrement écartés</option>
+      <option value="t">T-pose : bras horizontaux</option>
+    </select>
+    <p>Choisis la pose réelle du GLB avant de générer le squelette. Un mauvais choix éloigne les poignets et les coudes du corps.</p>
     <button id="rig" class="primary" disabled>Créer le rig humanoïde</button><p>Si ton GLB est déjà riggé, il est directement utilisable dans Animation. Aucun nouveau rig n'est créé.</p>
   </section>
   <section class="panel tool-page" data-page="animation">
