@@ -64,11 +64,20 @@ export function testAngles(preset,time,amplitude=1){
     case "head":head();break;
     case "torso":torso();break;
     case "all":{
-      // stagger actions: each region gets a full check during the 6s cycle
-      const region=Math.min(4,Math.floor(t/1.2));
-      const local=t%1.2;
-      const test=["arms","walk","legs","head","torso"][region];
-      return testAngles(test,local/RIG_TESTS[test].duration*RIG_TESTS[test].duration,amp);
+      // Crossfade between adjacent body regions without hard snaps.
+      const regions=["arms","walk","legs","head","torso"];
+      const u=t/1.2,region=Math.floor(u)%regions.length,local=u-Math.floor(u);
+      const current=testAngles(regions[region],local*RIG_TESTS[regions[region]].duration,amp);
+      const nextName=regions[(region+1)%regions.length];
+      const following=testAngles(nextName,local*RIG_TESTS[nextName].duration,amp);
+      const transition=Math.max(0,Math.min(1,(local-.72)/.28));
+      const blend=transition*transition*(3-2*transition);
+      const names=new Set([...Object.keys(current),...Object.keys(following)]);
+      for(const bone of names){
+        const a=current[bone]||[0,0,0],b=following[bone]||[0,0,0];
+        pose[bone]=a.map((n,i)=>n*(1-blend)+b[i]*blend);
+      }
+      return pose;
     }
   }
   return pose;
