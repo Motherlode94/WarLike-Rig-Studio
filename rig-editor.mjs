@@ -23,7 +23,7 @@ export function mirrorBoneName(name){
   return null;
 }
 const numeric=v=>Math.round(v*10000)/10000;
-export function createRigEditor({scene,camera,renderer,orbit,boneRoot,rigMap,skeleton,skinnedMeshes,plan,onSelect,onChange,onNotice}){
+export function createRigEditor({scene,camera,renderer,orbit,boneRoot,rigMap,skeleton,skinnedMeshes,plan,onSelect,onChange,onNotice,readOnly=false}){
   let selected=null,active=false,destroyed=false;const history=[];
   const snapshot=()=>new Map([...rigMap].map(([name,bone])=>[name,bone.position.clone()]));
   const pushHistory=()=>{history.push(snapshot());if(history.length>30)history.shift();};
@@ -101,8 +101,8 @@ export function createRigEditor({scene,camera,renderer,orbit,boneRoot,rigMap,ske
     if(selected&&byName.get(selected))byName.get(selected).scale.setScalar(1);
     selected=name;const b=rigMap.get(name);
     pivot.position.copy(worldPosition(b));
-    transform.attach(pivot);
-    if(active)transform.visible=true;
+    if(!readOnly)transform.attach(pivot);
+    if(active&&!readOnly)transform.visible=true;
     byName.get(name).scale.setScalar(1.55);
     onSelect({name,category:rigGroup(name),position:pivot.position.toArray().map(numeric)});
   }
@@ -115,9 +115,9 @@ export function createRigEditor({scene,camera,renderer,orbit,boneRoot,rigMap,ske
     if(result.length)select(result[0].object.userData.boneName);
   }
   function onDragging(event){orbit.enabled=!event.value;}
-  function onDragStart(){pushHistory();}
+  function onDragStart(){if(!readOnly)pushHistory();}
   function onObjectChange(){
-    if(!selected||!active)return;
+    if(readOnly||!selected||!active)return;
     setRestWorldPosition(selected,pivot.position.clone());
     // Critical: the bind pose is recomputed while there is NO animation pose;
     // the source geometry stays intact and no decimation is performed.
@@ -128,18 +128,20 @@ export function createRigEditor({scene,camera,renderer,orbit,boneRoot,rigMap,ske
   transform.addEventListener("mouseDown",onDragStart);
   function enable(flag){
     active=!!flag;markerGroup.visible=active;
-    transform.visible=active&&!!selected;
-    transform.enabled=active&&!!selected;
+    transform.visible=active&&!!selected&&!readOnly;
+    transform.enabled=active&&!!selected&&!readOnly;
     if(!active)transform.detach();
-    else if(selected)transform.attach(pivot);
+    else if(selected&&!readOnly)transform.attach(pivot);
     refresh();
   }
   function moveSelected(position){
+    if(readOnly)throw Error("Rig importé : édition de la bind pose non autorisée. Aperçu uniquement.");
     if(!selected)throw Error("Sélectionne d'abord un point coloré.");
     const target=new THREE.Vector3(...position.map(Number));
     pushHistory();setRestWorldPosition(selected,target);refresh();
   }
   function mirrorSelected(){
+    if(readOnly)throw Error("Rig importé : édition non autorisée.");
     if(!selected)throw Error("Sélectionne d'abord un point.");
     const other=mirrorBoneName(selected);
     if(!other||!rigMap.has(other))throw Error("Pas de point symétrique pour cet os.");
@@ -150,11 +152,13 @@ export function createRigEditor({scene,camera,renderer,orbit,boneRoot,rigMap,ske
     onNotice("Point symétrique positionné : "+other);
   }
   function undo(){
+    if(readOnly)return false;
     const state=history.pop();if(!state)return false;
     for(const [name,position] of state)rigMap.get(name)?.position.copy(position);
     updateSkin();refresh();if(selected)select(selected);return true;
   }
   function reset(){
+    if(readOnly)return;
     pushHistory();
     for(const bone of rigMap.values())bone.quaternion.identity();
     // Restore original rest joint positions, top-down.
