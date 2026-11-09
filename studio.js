@@ -146,7 +146,10 @@ async function load(file){
     configureImportedClips();
     $("jointSelect").replaceChildren(new Option("Aucune articulation",""));
     $("jointSelect").disabled=true;updateSelectedJoint(null);
-    scene.add(original);original.visible=true;
+    // Load either an unrigged source or an already-skinned model.
+    // In the latter case original is intentionally null: add the actual GLTF scene.
+    scene.add(next);
+    next.visible=true;
     sourceName=file.name.replace(/\.glb$/i,"");sourceName=sourceName.slice(0,96);
     frame(next);
     if(originalIsRigged){
