@@ -4,6 +4,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
 import {makeHumanoidPlan,weightsAt,inspectInput} from "./rig-core.mjs";
 import {createRigEditor,rigGroup,RIG_COLORS} from "./rig-editor.mjs";
+import {RIG_TESTS,testAngles,diagnosticSummary} from "./rig-tester.mjs";
 
 const $=id=>document.getElementById(id), status=(message,level="info")=>{
   $("status").textContent=message;$("status").dataset.level=level;
@@ -26,7 +27,56 @@ const loader=new GLTFLoader(),exporter=new GLTFExporter();
 let original=null,rigged=null,helpers=null,sourceName="",modelInfo=null,rigMap=null,rigPose=null;
 let pending=false,sourceBlobUrl=null,originalIsRigged=false;
 let editor=null,poseActive=false;
-function setBusy(value){pending=value;for(const id of ["file","rig","save","resetPose","testPose"])$(id).disabled=value;}
+const motion={playing:false,time:0,previousFrame:null};
+function stopMotion({keepPose=false}={}){
+  motion.playing=false;motion.previousFrame=null;
+  $("motionPlay").textContent="▶ Lire";
+  if(!keepPose&&rigMap){
+    for(const [name,bone] of rigMap)bone.quaternion.copy(rigPose.get(name));
+    poseActive=false;
+  }
+  if(rigMap)setMode($("modeRigged").checked?"rigged":"original");
+}
+function syncMotionUI(){
+  const key=$("motionPreset").value,def=RIG_TESTS[key];
+  $("motionTime").max=String(def.duration);
+  $("motionTime").value=String(Math.min(motion.time,def.duration));
+  $("motionTimeLabel").textContent=motion.time.toFixed(2).replace(".",",")+" s / "+def.duration.toFixed(2).replace(".",",")+" s";
+  $("motionAmplitudeLabel").textContent=$("motionAmplitude").value+" %";
+  $("motionSpeedLabel").textContent=(Number($("motionSpeed").value)/100).toLocaleString("fr")+"×";
+  $("motionPlay").disabled=!rigMap||pending;
+  $("motionPause").disabled=!rigMap||!motion.playing||pending;
+  $("motionTime").disabled=!rigMap||pending;
+}
+function sampleMotion(){
+  if(!rigMap)return;
+  // Restore reference rotations on every sample: no cumulative drift.
+  for(const [name,bone] of rigMap)bone.quaternion.copy(rigPose.get(name));
+  const preset=$("motionPreset").value;
+  const poses=testAngles(preset,motion.time,Number($("motionAmplitude").value)/100);
+  for(const [name,rotation] of Object.entries(poses)){
+    const bone=rigMap.get(name);if(!bone)continue;
+    bone.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(...rotation,"XYZ")));
+  }
+  poseActive=true;
+  $("modeRigged").checked=true;
+  setMode("rigged");
+  const changed=diagnosticSummary(poses);
+  $("motionDiagnostic").textContent=RIG_TESTS[preset].label+" · "+changed.length+" articulation(s) testée(s) : "+changed.join(", ")+
+    ". Vérifie la peau au niveau des plis, du cou et des vêtements. La géométrie n'est pas décimée.";
+  syncMotionUI();
+}
+function resetMotion(){
+  stopMotion();
+  motion.time=0;syncMotionUI();
+  $("motionDiagnostic").textContent="Pose de repos restaurée. Les poids de skinning et le placement des os restent inchangés.";
+}
+
+function setBusy(value){
+  pending=value;
+  for(const id of ["file","rig","save","resetPose","testPose","showRestPose"])$(id).disabled=value;
+  syncMotionUI();
+}
 function frame(object){
   object.updateMatrixWorld(true);
   const box=new THREE.Box3().setFromObject(object);
@@ -78,7 +128,7 @@ async function load(file){
     const next=gltf.scene;
     const info=inspect(next);
     if(!info.meshCount)throw Error("Le GLB ne contient aucun maillage.");
-    editor?.dispose();editor=null;poseActive=false;
+    stopMotion();editor?.dispose();editor=null;poseActive=false;
     disposeHelpers();clearObject(original);clearObject(rigged);
     original=next;rigged=null;rigMap=null;modelInfo=info;rigPose=null;
     $("jointSelect").replaceChildren(new Option("Aucune articulation",""));
@@ -89,6 +139,7 @@ async function load(file){
     frame(original);$("modeOriginal").checked=true;setMode("original");
     $("rig").disabled=!info.canAutoRig;
     $("save").disabled=true;$("testPose").disabled=true;$("resetPose").disabled=true;
+    motion.time=0;syncMotionUI();
     updateMetrics({
       "Maillages":info.meshCount,"Sommets":info.vertexCount.toLocaleString("fr"),
       "Triangles":Math.round(info.triangleCount).toLocaleString("fr"),
@@ -155,7 +206,7 @@ function generateRig(){
     target.add(mesh);total+=positions.count;
   });
   if(!total)throw Error("Aucun sommet utilisable.");
-  editor?.dispose();editor=null;poseActive=false;
+  stopMotion();editor?.dispose();editor=null;poseActive=false;
   disposeHelpers();clearObject(rigged);
   rigged=target;scene.add(rigged);
   rigMap=map;rigPose=new Map([...map].map(([name,b])=>[name,b.quaternion.clone()]));
@@ -174,7 +225,8 @@ function generateRig(){
   editor.select("Hips");
   editor.setSnap(Number($("snap").value)||null);
   $("modeRigged").checked=true;setMode("rigged");
-  $("save").disabled=false;$("testPose").disabled=false;$("resetPose").disabled=false;
+  $("save").disabled=false;$("testPose").disabled=false;$("resetPose").disabled=false;$("showRestPose").disabled=false;
+  motion.time=0;syncMotionUI();
   $("boneCount").textContent=String(bones.length);
   $("protectedCount").textContent=protectedVertices.toLocaleString("fr");
   $("vertexCount").textContent=total.toLocaleString("fr");
@@ -194,13 +246,14 @@ function updateSelectedJoint(value){
 }
 function resetPose(){
   if(!rigMap)return;
+  motion.playing=false;motion.previousFrame=null;syncMotionUI();
   for(const [name,b] of rigMap)b.quaternion.copy(rigPose.get(name));
   poseActive=false;
   setMode($("modeRigged").checked?"rigged":"original");
   status("Pose de repos restaurée.");
 }
 function demoPose(){
-  if(!rigMap)return;resetPose();
+  if(!rigMap)return;stopMotion();resetPose();
   const rotate=(name,x,y,z)=>{const b=rigMap.get(name);if(b)b.rotation.set(x,y,z);};
   rotate("LeftUpperArm",0,0,-.30);
   rotate("RightUpperArm",0,0,.30);
@@ -236,7 +289,32 @@ $("save").addEventListener("click",async()=>{
   setBusy(true);try{await save();}catch(error){status("Export : "+error.message,"error");}
   finally{setBusy(false);$("rig").disabled=!modelInfo?.canAutoRig;$("save").disabled=!rigged;$("testPose").disabled=!rigged;$("resetPose").disabled=!rigged;}
 });
-$("resetPose").addEventListener("click",resetPose);
+$("resetPose").addEventListener("click",resetMotion);
+$("showRestPose").addEventListener("click",resetMotion);
+$("motionPreset").addEventListener("change",()=>{
+  motion.time=0;
+  if(rigMap)sampleMotion();else syncMotionUI();
+});
+$("motionTime").addEventListener("input",event=>{
+  motion.time=Number(event.target.value);
+  if(rigMap)sampleMotion();else syncMotionUI();
+});
+$("motionAmplitude").addEventListener("input",()=>{
+  if(rigMap)sampleMotion();else syncMotionUI();
+});
+$("motionSpeed").addEventListener("input",syncMotionUI);
+$("motionPlay").addEventListener("click",()=>{
+  if(!rigMap||pending)return;
+  if(motion.time>=RIG_TESTS[$("motionPreset").value].duration)motion.time=0;
+  motion.playing=true;motion.previousFrame=null;
+  sampleMotion();syncMotionUI();
+  status("Lecture du test : inspecte les articulations pendant le mouvement.","success");
+});
+$("motionPause").addEventListener("click",()=>{
+  motion.playing=false;motion.previousFrame=null;syncMotionUI();
+  status("Test en pause : la pose reste affichée. Repos pour revenir à la pose neutre.");
+});
+
 $("testPose").addEventListener("click",demoPose);
 $("showBones").addEventListener("change",()=>setMode($("modeRigged").checked?"rigged":"original"));
 $("editJoints").addEventListener("change",()=>setMode($("modeRigged").checked?"rigged":"original"));
@@ -278,5 +356,22 @@ function resize(){
  renderer.setSize(width,height,false);camera.aspect=width/height;camera.updateProjectionMatrix();
 }
 new ResizeObserver(resize).observe($("stage"));
-function loop(){requestAnimationFrame(loop);controls.update();renderer.render(scene,camera);}
-resize();loop();
+function loop(now){
+  requestAnimationFrame(loop);
+  if(motion.playing&&rigMap){
+    if(motion.previousFrame!==null){
+      const dt=Math.min(.08,Math.max(0,(now-motion.previousFrame)/1000));
+      const duration=RIG_TESTS[$("motionPreset").value].duration;
+      const speed=Number($("motionSpeed").value)/100;
+      motion.time+=dt*speed;
+      if(motion.time>=duration){
+        if($("motionLoop").checked)motion.time%=duration;
+        else{motion.time=duration-1e-6;motion.playing=false;motion.previousFrame=null;}
+      }
+      sampleMotion();
+    }
+    motion.previousFrame=motion.playing?now:null;
+  }
+  controls.update();renderer.render(scene,camera);
+}
+resize();syncMotionUI();requestAnimationFrame(loop);
