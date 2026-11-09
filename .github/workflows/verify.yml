@@ -1,0 +1,25 @@
+name: Verify WarLike Rig Studio
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: JavaScript syntax
+        run: |
+          node --check studio.js
+          node --check rig-core.mjs
+      - name: Automated rig tests
+        run: node --test tests/*.test.mjs
+      - name: Verify app files
+        run: |
+          test -s index.html
+          test -s studio.js
+          test -s rig-core.mjs
+          grep -q 'id="viewport"' index.html
+          grep -q 'id="rig"' index.html
