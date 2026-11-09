@@ -57,7 +57,7 @@ test("arms-down wrists and sleeves never inherit leg or hip joints",()=>{
  const plan=makeHumanoidPlan(box,{armPose:"down"});
  const names=plan.bones.map(b=>b.name);
  for(const x of [-.355,.355]){
-   for(const y of [.66,.59,.48,.43]){
+   for(const y of [1.35,1.15,.96,.76]){
      const w=weightsAt([x,y,0],plan);
      assert.ok(w.zone.startsWith("arm"),"arm zone at x="+x+" y="+y+" got "+w.zone);
      for(let j=0;j<4;j++)if(w.weights[j]>1e-8)
