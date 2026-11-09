@@ -1,0 +1,215 @@
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+import {makeHumanoidPlan,weightsAt,inspectInput} from "./rig-core.mjs";
+
+const $=id=>document.getElementById(id), status=(message,level="info")=>{
+  $("status").textContent=message;$("status").dataset.level=level;
+};
+const renderer=new THREE.WebGLRenderer({canvas:$("viewport"),antialias:true,alpha:false,powerPreference:"high-performance"});
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.75));
+const scene=new THREE.Scene();
+scene.background=new THREE.Color("#111724");
+scene.add(new THREE.HemisphereLight(0xffffff,0x546179,2.2));
+const key=new THREE.DirectionalLight(0xffe8d7,2.7);
+key.position.set(3,6,4);scene.add(key);
+const rim=new THREE.DirectionalLight(0x88b8ff,1.4);rim.position.set(-4,2,-3);scene.add(rim);
+const grid=new THREE.GridHelper(10,20,0x3c5366,0x23313f);scene.add(grid);
+const camera=new THREE.PerspectiveCamera(37,1,.01,2000);
+camera.position.set(2,1.7,4);
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;controls.dampingFactor=.07;
+const loader=new GLTFLoader(),exporter=new GLTFExporter();
+let original=null,rigged=null,helpers=null,sourceName="",modelInfo=null,rigMap=null,rigPose=null;
+let pending=false,sourceBlobUrl=null,originalIsRigged=false;
+function setBusy(value){pending=value;for(const id of ["file","rig","save","resetPose","testPose"])$(id).disabled=value;}
+function frame(object){
+  object.updateMatrixWorld(true);
+  const box=new THREE.Box3().setFromObject(object);
+  if(box.isEmpty())throw Error("Aucune géométrie visible dans le GLB.");
+  const center=box.getCenter(new THREE.Vector3()),size=box.getSize(new THREE.Vector3());
+  controls.target.copy(center);
+  const distance=Math.max(1,size.length()/(2*Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)));
+  camera.position.copy(center).add(new THREE.Vector3(distance*.30,distance*.15,distance*.95));
+  camera.near=Math.max(.001,distance/300);camera.far=Math.max(100,distance*12);camera.updateProjectionMatrix();
+  grid.position.y=box.min.y;
+  controls.update();return box;
+}
+function clearObject(o){if(o){scene.remove(o);}}
+function disposeHelpers(){if(helpers){scene.remove(helpers);helpers=null;}}
+function updateMetrics(data){
+  $("metrics").replaceChildren();
+  for(const [label,value] of Object.entries(data)){
+    const row=document.createElement("div"),a=document.createElement("span"),b=document.createElement("strong");
+    a.textContent=label;b.textContent=String(value);row.append(a,b);$("metrics").append(row);
+  }
+}
+function inspect(root) {
+  const stats={meshCount:0,skinCount:0,vertexCount:0,triangleCount:0,morphCount:0};
+  root.traverse(o=>{
+    if(!o.isMesh)return;stats.meshCount++;
+    if(o.isSkinnedMesh)stats.skinCount++;
+    const g=o.geometry,p=g?.getAttribute("position"),index=g?.index;
+    stats.vertexCount+=p?.count||0;
+    stats.triangleCount+=index?index.count/3:(p?.count||0)/3;
+    stats.morphCount+=Object.keys(o.morphTargetDictionary||{}).length;
+  });
+  return inspectInput(stats);
+}
+function setMode(mode){
+  if(original)original.visible=mode==="original";
+  if(rigged)rigged.visible=mode==="rigged";
+  if(helpers)helpers.visible=mode==="rigged"&&$("showBones").checked;
+  $("modeOriginal").disabled=!original;
+  $("modeRigged").disabled=!rigged;
+}
+async function load(file){
+  if(!file || !/\.glb$/i.test(file.name))throw Error("Un fichier GLB est nécessaire.");
+  if(file.size>150*1024*1024)throw Error("Limite de sécurité : 150 Mio par GLB.");
+  if(sourceBlobUrl)URL.revokeObjectURL(sourceBlobUrl);
+  sourceBlobUrl=URL.createObjectURL(file);
+  try {
+    const gltf=await loader.loadAsync(sourceBlobUrl);
+    const next=gltf.scene;
+    const info=inspect(next);
+    if(!info.meshCount)throw Error("Le GLB ne contient aucun maillage.");
+    disposeHelpers();clearObject(original);clearObject(rigged);
+    original=next;rigged=null;rigMap=null;modelInfo=info;rigPose=null;
+    scene.add(original);original.visible=true;
+    sourceName=file.name.replace(/\.glb$/i,"");sourceName=sourceName.slice(0,96);
+    originalIsRigged=info.alreadyRigged;
+    frame(original);$("modeOriginal").checked=true;setMode("original");
+    $("rig").disabled=!info.canAutoRig;
+    $("save").disabled=true;$("testPose").disabled=true;$("resetPose").disabled=true;
+    updateMetrics({
+      "Maillages":info.meshCount,"Sommets":info.vertexCount.toLocaleString("fr"),
+      "Triangles":Math.round(info.triangleCount).toLocaleString("fr"),
+      "Squelettes présents":info.skinCount,"Morph targets":info.morphCount,
+      "Fichier":(file.size/1048576).toFixed(1)+" Mio"
+    });
+    status(info.alreadyRigged
+      ?"Ce GLB contient déjà un rig. L'auto-rig est désactivé pour éviter d'écraser ses poids."
+      :"GLB chargé sans modifier sa géométrie. Vérifie qu'il est debout (Y haut) avant de créer son rig.");
+  } finally {URL.revokeObjectURL(sourceBlobUrl);sourceBlobUrl=null;}
+}
+function boneRig(plan) {
+  const map=new Map();
+  for(const b of plan.bones){
+    const bone=new THREE.Bone();bone.name=b.name;
+    bone.position.set(...b.position);
+    map.set(b.name,bone);
+  }
+  const group=new THREE.Group();group.name="WarLikeRig";
+  for(const b of plan.bones){
+    const bone=map.get(b.name);
+    if(b.parent){
+      const parent=map.get(b.parent),position=parent.position.clone();
+      bone.position.sub(position);parent.add(bone);
+    }else group.add(bone);
+  }
+  group.updateMatrixWorld(true);
+  return {group,bones:plan.bones.map(b=>map.get(b.name)),map};
+}
+function generateRig(){
+  if(!original||!modelInfo?.canAutoRig)throw Error("Importe d'abord un GLB non riggé.");
+  original.updateMatrixWorld(true);
+  const bounds=new THREE.Box3().setFromObject(original);
+  const plan=makeHumanoidPlan(bounds);
+  const {group,bones,map}=boneRig(plan);
+  const target=new THREE.Group();target.name="WarLike_Rigged_Character";
+  target.add(group);
+  const skeleton=new THREE.Skeleton(bones);
+  let total=0,protectedVertices=0;
+  original.traverse(object=>{
+    if(!object.isMesh)return;
+    if(object.isSkinnedMesh)throw Error("Rig préexistant détecté : opération annulée.");
+    const geo=object.geometry.clone();
+    geo.applyMatrix4(object.matrixWorld);
+    const positions=geo.getAttribute("position");
+    if(!positions)return;
+    const indices=new Uint16Array(positions.count*4),weights=new Float32Array(positions.count*4);
+    for(let i=0;i<positions.count;i++){
+      const value=weightsAt([positions.getX(i),positions.getY(i),positions.getZ(i)],plan,{lockHead:$("lockHead").checked});
+      if(value.zone==="head-protected")protectedVertices++;
+      for(let j=0;j<4;j++){indices[i*4+j]=value.indices[j];weights[i*4+j]=value.weights[j];}
+    }
+    geo.setAttribute("skinIndex",new THREE.Uint16BufferAttribute(indices,4));
+    geo.setAttribute("skinWeight",new THREE.Float32BufferAttribute(weights,4));
+    // Rigid head deformation and PBR textures retain the original vertex density.
+    const mesh=new THREE.SkinnedMesh(geo,object.material);
+    mesh.name=object.name||"WarLikeSkinnedMesh";
+    mesh.frustumCulled=false;
+    mesh.bind(skeleton,new THREE.Matrix4());
+    target.add(mesh);total+=positions.count;
+  });
+  if(!total)throw Error("Aucun sommet utilisable.");
+  disposeHelpers();clearObject(rigged);
+  rigged=target;scene.add(rigged);
+  rigMap=map;rigPose=new Map([...map].map(([name,b])=>[name,b.quaternion.clone()]));
+  const debug=new THREE.SkeletonHelper(group);
+  debug.material.depthTest=false;debug.material.transparent=true;debug.material.opacity=.95;
+  debug.name="SkeletonPreview";scene.add(debug);helpers=debug;
+  $("modeRigged").checked=true;setMode("rigged");
+  $("save").disabled=false;$("testPose").disabled=false;$("resetPose").disabled=false;
+  $("boneCount").textContent=String(bones.length);
+  $("protectedCount").textContent=protectedVertices.toLocaleString("fr");
+  $("vertexCount").textContent=total.toLocaleString("fr");
+  frame(rigged);
+  status("Rig expérimental créé : "+bones.length+" os, "+protectedVertices+" sommets de tête verrouillés. Contrôle les déformations avant l'export.","success");
+}
+function resetPose(){
+  if(!rigMap)return;
+  for(const [name,b] of rigMap)b.quaternion.copy(rigPose.get(name));
+  status("Pose de repos restaurée.");
+}
+function demoPose(){
+  if(!rigMap)return;resetPose();
+  const rotate=(name,x,y,z)=>{const b=rigMap.get(name);if(b)b.rotation.set(x,y,z);};
+  rotate("LeftUpperArm",0,0,-.30);
+  rotate("RightUpperArm",0,0,.30);
+  rotate("LeftLowerArm",0,0,-.15);
+  rotate("RightLowerArm",0,0,.15);
+  rotate("Head",.07,0,.08);
+  status("Pose de test appliquée. Inspecte les épaules, les coudes, le cou et les lèvres.");
+}
+async function save(){
+  if(!rigged)throw Error("Aucun rig à exporter.");
+  resetPose();
+  const visible=rigged.visible;
+  rigged.visible=true;
+  const detached=helpers?.visible; if(helpers)helpers.visible=false;
+  try{
+    const buffer=await exporter.parseAsync(rigged,{binary:true,onlyVisible:true,trs:true,animations:[]});
+    const blob=new Blob([buffer],{type:"model/gltf-binary"});
+    const url=URL.createObjectURL(blob),link=document.createElement("a");
+    link.href=url;link.download=(sourceName||"avatar")+"_warlike_rig.glb";
+    document.body.append(link);link.click();link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),6000);
+    status("GLB riggé exporté ("+(blob.size/1048576).toFixed(1)+" Mio). Contrôle son import dans WarLike Engine.","success");
+  }finally{rigged.visible=visible;if(helpers)helpers.visible=detached;}
+}
+$("file").addEventListener("change",async e=>{
+  const f=e.target.files?.[0];e.target.value="";if(!f)return;
+  setBusy(true);status("Chargement du modèle…");
+  try{await load(f);}catch(error){status("Import : "+error.message,"error");}finally{setBusy(false);$("rig").disabled=!modelInfo?.canAutoRig;$("save").disabled=!rigged;$("testPose").disabled=!rigged;$("resetPose").disabled=!rigged;}
+});
+$("rig").addEventListener("click",()=>{try{generateRig();}catch(error){status("Rig : "+error.message,"error");}});
+$("save").addEventListener("click",async()=>{
+  setBusy(true);try{await save();}catch(error){status("Export : "+error.message,"error");}
+  finally{setBusy(false);$("rig").disabled=!modelInfo?.canAutoRig;$("save").disabled=!rigged;$("testPose").disabled=!rigged;$("resetPose").disabled=!rigged;}
+});
+$("resetPose").addEventListener("click",resetPose);
+$("testPose").addEventListener("click",demoPose);
+$("showBones").addEventListener("change",()=>setMode($("modeRigged").checked?"rigged":"original"));
+$("modeOriginal").addEventListener("change",()=>setMode("original"));
+$("modeRigged").addEventListener("change",()=>setMode("rigged"));
+function resize(){
+ const rect=$("stage").getBoundingClientRect();
+ const width=Math.max(1,rect.width),height=Math.max(1,rect.height);
+ renderer.setSize(width,height,false);camera.aspect=width/height;camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe($("stage"));
+function loop(){requestAnimationFrame(loop);controls.update();renderer.render(scene,camera);}
+resize();loop();
