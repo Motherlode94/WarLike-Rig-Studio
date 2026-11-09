@@ -228,7 +228,7 @@ function generateRig(){
   if(!original||!modelInfo?.canAutoRig)throw Error("Importe d'abord un GLB non riggé.");
   original.updateMatrixWorld(true);
   const bounds=new THREE.Box3().setFromObject(original);
-  const plan=makeHumanoidPlan(bounds);
+  const plan=makeHumanoidPlan(bounds,{armPose:$("armPose").value});
   const {group,bones,map}=boneRig(plan);
   const target=new THREE.Group();target.name="WarLike_Rigged_Character";
   target.add(group);
