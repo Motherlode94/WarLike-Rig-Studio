@@ -38,3 +38,17 @@ test("refuses destructive autorig when a GLB already has skinning",()=>{
 test("accepts a genuine unrigged mesh as experimental candidate",()=>{
  assert.equal(inspectInput({meshCount:1,skinCount:0,vertexCount:3000,triangleCount:1200,morphCount:0}).canAutoRig,true);
 });
+
+test("arm posture keeps elbows and wrists close to actual arms-down body",()=>{
+ const down=makeHumanoidPlan(box,{armPose:"down"});
+ const a=makeHumanoidPlan(box,{armPose:"a"});
+ const t=makeHumanoidPlan(box,{armPose:"t"});
+ const joint=(p,name)=>p.bones.find(b=>b.name===name).position;
+ const [cx]=down.center;
+ assert.ok(Math.abs(joint(down,"LeftHand")[0]-cx)<Math.abs(joint(a,"LeftHand")[0]-cx));
+ assert.ok(Math.abs(joint(a,"LeftHand")[0]-cx)<Math.abs(joint(t,"LeftHand")[0]-cx));
+ assert.ok(joint(down,"LeftHand")[1]<joint(down,"LeftShoulder")[1]);
+ assert.ok(joint(t,"LeftHand")[1]>joint(down,"LeftHand")[1]);
+ assert.ok(Math.abs(joint(down,"LeftHand")[0]+joint(down,"RightHand")[0]-2*cx)<1e-8);
+});
+test("rejects unknown arm pose values",()=>assert.throws(()=>makeHumanoidPlan(box,{armPose:"unknown"})));
