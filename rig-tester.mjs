@@ -24,10 +24,10 @@ export function testAngles(preset,time,amplitude=1){
   if(!RIG_TESTS[preset])throw new Error("Test inconnu : "+preset);
   if(!Number.isFinite(time)||!Number.isFinite(amplitude))throw new Error("Paramètres de test invalides.");
   const amp=clamp(amplitude,0,1.5),duration=RIG_TESTS[preset].duration;
-  const t=((time%duration)+duration)%duration;
+  const t=Number((((time%duration)+duration)%duration).toFixed(8));
   const phase=t*2*PI/duration;
   const pose={};
-  const set=(name,x=0,y=0,z=0)=>{pose[name]=[x*amp,y*amp,z*amp];};
+  const set=(name,x=0,y=0,z=0)=>{pose[name]=amp===0?[0,0,0]:[x*amp,y*amp,z*amp];};
   const breathe=()=>{set("Spine",.025*sin(phase),0,.01*sin(phase));set("Chest",-.025*sin(phase));};
   const arms=()=>{const a=sin(phase),b=sin(phase-.8);
     set("LeftUpperArm",.08,0,-.52*a);
