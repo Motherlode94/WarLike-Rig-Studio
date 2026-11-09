@@ -42,27 +42,57 @@ const distToSegment=(p,a,b)=>{
 };
 // The source mesh positions remain unchanged. This experimental region-aware
 // weighting is an initial editable skin, NOT a production-quality autorigger.\n// A broader influence kernel reduces hard elbow/knee transitions; source topology is unchanged.
+// Assign vertices only to anatomically neighbouring bones. Earlier versions
+// assigned every vertex below the wrist height to LEGS; this stretched sleeves
+// into protruding tubes when a character moved.
 export function weightsAt(point,plan,{lockHead=true}={}) {
-  const [x,y,z]=point,[cx,cz]=plan.center,h=plan.height;
-  const yn=(y-plan.min[1])/h,xn=(x-cx)/h;
-  const idx=Object.fromEntries(plan.bones.map((b,i)=>[b.name,i]));
-  if(lockHead&&yn>=.865)return {indices:[idx.Head,0,0,0],weights:[1,0,0,0],zone:"head-protected"};
+  if(!Array.isArray(point)||point.length!==3||!point.every(Number.isFinite))
+    throw Error("Sommet invalide.");
+  const [x,y]=point,[cx]=plan.center,h=plan.height;
+  const yn=(y-plan.min[1])/h, xn=(x-cx)/h,absx=Math.abs(xn);
+  const idx=Object.fromEntries(plan.bones.map((bone,i)=>[bone.name,i]));
+  const pack=(values,zone)=>{
+    const pairs=values.sort((a,b)=>b.score-a.score).slice(0,4);
+    const sum=pairs.reduce((total,item)=>total+item.score,0);
+    const indices=pairs.map(item=>item.index),weights=pairs.map(item=>item.score/sum);
+    while(indices.length<4){indices.push(0);weights.push(0);}
+    return {indices,weights,zone};
+  };
+  if(lockHead&&yn>=.865)
+    return {indices:[idx.Head,0,0,0],weights:[1,0,0,0],zone:"head-protected"};
   const side=xn>=0?"Left":"Right";
-  let names;
-  if(yn<.51)names=[side+"UpperLeg",side+"LowerLeg",side+"Foot","Hips"];
-  else if(Math.abs(xn)>.155&&yn>.50&&yn<.83)
-    names=[side+"UpperArm",side+"LowerArm",side+"Hand",side+"Shoulder"];
-  else if(yn>.79) names=["Neck","Head","Chest","Spine"];
-  else names=["Spine","Chest","Hips","Neck"];
-  const pairs=names.map(name=>{
-    const b=plan.bones[idx[name]],parent=plan.bones.find(v=>v.name===b.parent)||b;
-    const distance=distToSegment(point,parent.position,b.position);
-    return {index:idx[name],score:1/Math.max(.055*h,distance)**1.6};
-  }).sort((a,b)=>b.score-a.score).slice(0,4);
-  const sum=pairs.reduce((s,a)=>s+a.score,0);
-  const weights=pairs.map(a=>a.score/sum),indices=pairs.map(a=>a.index);
-  while(weights.length<4){weights.push(0);indices.push(0);}
-  return {indices,weights,zone:names[0]};
+  // Protect lower arms and hands from accidentally following legs or hips.
+  // Arm region depends on the actual rest pose selected by the user.
+  const ranges={
+    down:{min:.32,max:.83,outer:.145},
+    a:{min:.44,max:.84,outer:.155},
+    t:{min:.67,max:.86,outer:.16}
+  };
+  const range=ranges[plan.armPose||"down"];
+  const isArm=yn>=range.min&&yn<=range.max&&absx>=range.outer;
+  let names,zone;
+  if(isArm){
+    names=[side+"Shoulder",side+"UpperArm",side+"LowerArm",side+"Hand"];
+    zone="arm-"+side.toLowerCase();
+  }else if(yn<.51){
+    names=["Hips",side+"UpperLeg",side+"LowerLeg",side+"Foot"];
+    zone="leg-"+side.toLowerCase();
+  }else if(yn>.81){
+    names=["Chest","Neck","Head"];zone="neck";
+  }else{
+    names=["Hips","Spine","Chest","Neck"];zone="torso";
+  }
+  // Local Gaussian weighting on actual bone segments. A small spatial
+  // kernel avoids heavy influences from distant joints, while neighbouring
+  // joints still blend across elbow, knee and shoulder folds.
+  const sigma=.035*h;
+  const values=names.map(name=>{
+    const bone=plan.bones[idx[name]];
+    const parent=plan.bones.find(other=>other.name===bone.parent)||bone;
+    const distance=distToSegment(point,parent.position,bone.position);
+    return {index:idx[name],score:Math.max(1e-12,Math.exp(-.5*(distance/sigma)**2))};
+  });
+  return pack(values,zone);
 }
 export function inspectInput({meshCount,skinCount,vertexCount,triangleCount,morphCount}) {
   return {
