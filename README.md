@@ -1,8 +1,10 @@
 # WarLike Rig Studio
 
-**Prototype indépendant v0.1** pour préparer un rig humanoïde à partir d'un modèle GLB **non riggé**, sans modifier son nombre de sommets ni réduire la définition de son visage. Développé pour l'écosystème WarLike, notamment WarLike Heart.
+**Prototype indépendant v0.3** pour préparer un rig humanoïde à partir d'un modèle GLB **non riggé**, sans modifier son nombre de sommets ni réduire la définition de son visage. Développé pour l'écosystème WarLike, notamment WarLike Heart.
 
 ## Utilisation
+
+**Interface v0.3 :** la vue 3D occupe tout l'écran. Utiliser le bouton **☰ Outils** pour ouvrir le menu, puis choisir Importer, Squelette, Articulations, Animation, Export ou Diagnostics. Le panneau se ferme avec ✕, Échap ou un clic en dehors. Les options n'occupent plus l'écran en permanence.
 
 1. Ouvrir `index.html` dans un navigateur HTTPS (Cloudflare Pages ou équivalent) avec WebGL et accès au CDN Three.js. Le site est statique et ne nécessite aucun compte.
 2. Importer un GLB humanoïde debout, **Y vers le haut**, de préférence en A-pose, sans squelette préalable.
@@ -19,7 +21,7 @@ Les modèles sont lus **dans le navigateur**, sans envoi sur un serveur applicat
 - Placement **heuristique** de 19 os humanoïdes et création d'une hiérarchie d'os.
 - Affectation automatique expérimentale de quatre influences maximum par sommet selon la position, sans décimation de géométrie.
 - **Protection de la tête** : les sommets situés dans la région supérieure sont liés rigidement à l'os Head. Cela vise à éviter les déformations faciales provoquées par un mauvais skinning, mais n'améliore pas la qualité géométrique du visage d'origine.
-- Pose simple de test et restauration de la pose neutre.
+- Placement interactif des articulations : points colorés, gizmo de déplacement, coordonnées X/Y/Z, symétrie et annulation (prototype à valider sur de vrais GLB).\n- Pose simple de test et restauration de la pose neutre.
 - Export du rig/skin en GLB ; le GLB doit être testé dans d'autres logiciels après export.
 - Refus d'auto-rigger un modèle possédant déjà un skin (évite l'écrasement involontaire).
 - Tests Node des algorithmes de base ; workflow GitHub Actions.
@@ -28,7 +30,7 @@ Les modèles sont lus **dans le navigateur**, sans envoi sur un serveur applicat
 
 **Prototype technique, pas un outil de rigging final ni une garantie d'animation correcte.** L'auto-placement repose sur des ratios corporels fixes, **pas sur une détection anatomique**. Le résultat dépend fortement de la pose, de l'orientation, des proportions et de la position du personnage. Les cheveux, vêtements et doigts peuvent mal se déformer ; il faut inspecter les épaules, coudes, hanches et genoux. Aucun contrôle visuel réel du rendu dans un navigateur ou test complet d'export-import n'est encore confirmé.
 
-- Pas de peinture manuelle des poids, placement interactif des os, ni IK d'édition.
+- Pas de peinture manuelle des poids ni IK d'édition ; le placement interactif des os reste expérimental.
 - Pas de poids automatiques fondés sur géodésiques ou diffusion volumique.
 - Pas de génération de blendshapes, d'expressions faciales, de mâchoire ni de visèmes.
 - Pas de retopologie, normal-map baking ni réduction des polygones : les modèles volumineux restent volumineux.
