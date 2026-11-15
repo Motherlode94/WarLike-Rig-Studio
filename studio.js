@@ -7,6 +7,7 @@ import {smoothSkinWeights} from "./skin-smoothing.mjs";
 import {createRigEditor,rigGroup,RIG_COLORS} from "./rig-editor.mjs";
 import {RIG_TESTS,testAngles,diagnosticSummary} from "./rig-tester.mjs";
 import {inspectExistingSkeletons} from "./existing-rig.mjs";
+import {validateIdolRigFiles,rigOutputName} from "./idol-rig-batch.mjs";
 
 const $=id=>document.getElementById(id), status=(message,level="info")=>{
   $("status").textContent=message;$("status").dataset.level=level;
@@ -352,17 +353,6 @@ function clearBatchOutputs(){
  for(const url of batchUrls)URL.revokeObjectURL(url);
  batchUrls.clear();$("idolBatchResults").replaceChildren();
 }
-function validateBatchFiles(files){
- const list=Array.from(files||[]);
- if(!list.length||list.length>7)throw Error('Choisis entre 1 et 7 fichiers GLB.');
- let total=0;
- for(const file of list){
-  if(!/\.glb$/i.test(file.name)||file.size<1||file.size>20*1048576)throw Error('GLB invalide ou supérieur à 20 Mio : '+file.name);
-  total+=file.size;
- }
- if(total>100*1048576)throw Error('Lot supérieur à 100 Mio.');
- return list;
-}
 function syncBatchRun(){
  $("idolBatchRun").disabled=batchActive||!$("idolBatchConfirm").checked||!$("idolBatchFiles").files?.length;
 }
@@ -372,7 +362,7 @@ $("idolBatchConfirm").addEventListener('change',syncBatchRun);
 $("idolBatchRun").addEventListener('click',async()=>{
  if(batchActive||!$("idolBatchConfirm").checked)return;
  let files;
- try{files=validateBatchFiles($("idolBatchFiles").files)}catch(error){$("idolBatchStatus").textContent=error.message;return}
+ try{files=validateIdolRigFiles($("idolBatchFiles").files)}catch(error){$("idolBatchStatus").textContent=error.message;return}
  batchActive=true;syncBatchRun();clearBatchOutputs();
  let ok=0;
  try{
@@ -390,7 +380,7 @@ $("idolBatchRun").addEventListener('click',async()=>{
     const blob=new Blob([buffer],{type:'model/gltf-binary'}),url=URL.createObjectURL(blob);
     batchUrls.add(url);
     const link=document.createElement('a');link.href=url;
-    link.download=file.name.replace(/\.glb$/i,'')+'_warlike_rig.glb';
+    link.download=rigOutputName(file.name);
     link.textContent='↓ '+link.download+' · '+(blob.size/1048576).toFixed(1)+' Mio · à valider dans WarLike Engine';
     $("idolBatchResults").append(link);ok++;
    }catch(error){
