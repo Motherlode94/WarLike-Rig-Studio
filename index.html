@@ -81,7 +81,7 @@ body.tools-open #toolsDrawer{transform:translateX(0);visibility:visible;pointer-
 
 <link rel="stylesheet" href="./design-system/warlike-foundation.css?v=1.1">
 <link rel="stylesheet" href="./design-system/warlike-shell.css?v=1.1">
-</head>
+<style>#idolBatchPanel{margin-top:16px}#idolBatchPanel h3{margin:0;color:#ffd4e9;font-size:16px}#idolBatchResults{display:grid;gap:8px}#idolBatchResults a{display:block;padding:9px;border:1px solid #596a87;border-radius:8px;overflow-wrap:anywhere}#idolBatchResults p{border-left:3px solid #c27e98;padding:7px}#idolBatchPanel input[type=file]{display:none}</style></head>
 <body>
 <header><div class="brand"><button id="menuToggle" type="button" aria-controls="toolsDrawer" aria-expanded="false" aria-label="Ouvrir le menu des outils" title="Menu des outils">☰ Outils</button><b>♥</b><span>WARLIKE RIG STUDIO</span></div><small>Prototype v0.9 · Test de rig intégré</small></header>
 <div id="drawerBackdrop" hidden></div>
@@ -121,7 +121,7 @@ body.tools-open #toolsDrawer{transform:translateX(0);visibility:visible;pointer-
       <option value="3">Souple (3 passages)</option>
     </select>
     <p>Répartit les poids entre sommets voisins d'une même zone anatomique, sans modifier la géométrie ni les textures. Un rig importé conserve ses poids d'origine.</p>
-    <button id="rig" class="primary" disabled>Créer le rig humanoïde</button><p>Si ton GLB est déjà riggé, il est directement utilisable dans Animation. Aucun nouveau rig n'est créé.</p>
+    <button id="rig" class="primary" disabled>Créer le rig humanoïde</button><div class="panel" id="idolBatchPanel"><h3>WarLike SEVEN · Auto-rig groupé</h3><p>Importe jusqu’à sept GLB humanoïdes (20 Mio chacun, 100 Mio au total). Les modèles non riggés reçoivent un squelette et des poids expérimentaux ; les modèles déjà skinnés sont conservés.</p><label class="file">Sélectionner les sept GLB<input id="idolBatchFiles" type="file" accept=".glb,model/gltf-binary" multiple></label><label class="toggle"><input id="idolBatchConfirm" type="checkbox"> Compris : auto-rig approximatif, inspection manuelle obligatoire</label><button id="idolBatchRun" type="button" class="primary" disabled>Lancer l’auto-rig des modèles</button><p id="idolBatchStatus" role="status">Aucun modèle préparé.</p><div id="idolBatchResults" aria-live="polite"></div></div><p>Si ton GLB est déjà riggé, il est directement utilisable dans Animation. Aucun nouveau rig n'est créé.</p>
   </section>
   <section class="panel tool-page" data-page="animation">
     <h2>3 · Contrôler la pose</h2>

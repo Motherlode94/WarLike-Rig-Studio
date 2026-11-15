@@ -74,3 +74,16 @@ Pour les **nouveaux rigs créés dans WarLike**, ouvrir **Outils → Squelette �
 **Limites :** le lissage atténue certaines cassures, mais ne garantit pas une peau naturelle : les hanches, les épaules, les vêtements amples et les cheveux nécessitent parfois une peinture manuelle des poids, des os correctifs ou une simulation des tissus. Les GLB **déjà riggés** gardent leurs poids et animations d'origine : leurs déformations ne seront pas réparées par ce réglage. Pour l'évaluer, importer un GLB non riggé, générer un nouveau rig, puis tester la marche de face et de profil, avant d'exporter.
 
 Tests : `node --test tests/skin-smoothing.test.mjs` et `node --test tests/rig-core.test.mjs`. Tests automatisés ≠ validation visuelle des déformations du personnage.
+
+
+## WarLike SEVEN : rigging automatique par lot (prototype)
+
+Le menu **Outils → Squelette** dispose d'une section **Auto-rig groupé** qui accepte jusqu'à sept GLB, avec une limite de 20 Mio par fichier et 100 Mio pour l'ensemble. Les fichiers sont traités **séquentiellement dans le navigateur** : les maillages humanoïdes non skinnés passent par les fonctions de création de rig existantes (`makeHumanoidPlan`, `weightsAt`, `smoothSkinWeights`) et reçoivent le squelette expérimental de 19 os. Les GLB possédant déjà un rig valide sont exportés sans recalculer les poids.
+
+Chaque résultat apparaît comme un lien de téléchargement `*_warlike_rig.glb`. Les liens restent locaux à la session et sont révoqués lors de la fermeture de la page. Aucun téléchargement n'est lancé automatiquement ; vérifier les sept exports un à un dans WarLike Engine et dans l'éditeur de rig.
+
+**Limites :** la distribution des poids dépend de proportions corporelles heuristiques, sans détection anatomique véritable ni peinture des poids. Des erreurs aux épaules, aux hanches, aux vêtements, aux cheveux et aux doigts peuvent nécessiter des corrections manuelles. Les tests de déformation et le retargeting de danse restent à effectuer. Les morph targets nécessaires au chant ne sont pas créés par le rigging automatique. Les sept fichiers GLB de WarLike SEVEN ne sont pas intégrés dans ce dépôt et **n'ont pas été riggés à distance** par cette modification.
+
+Ne pas confondre « rig créé automatiquement » et « personnage validé pour concert ». Un contrôle artistique et de déformation est nécessaire avant tout usage public.
+
+Tests : `node --test tests/idol-rig-batch.test.mjs`.

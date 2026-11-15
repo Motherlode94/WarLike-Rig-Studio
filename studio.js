@@ -7,6 +7,7 @@ import {smoothSkinWeights} from "./skin-smoothing.mjs";
 import {createRigEditor,rigGroup,RIG_COLORS} from "./rig-editor.mjs";
 import {RIG_TESTS,testAngles,diagnosticSummary} from "./rig-tester.mjs";
 import {inspectExistingSkeletons} from "./existing-rig.mjs";
+import {validateIdolRigFiles,rigOutputName} from "./idol-rig-batch.mjs";
 
 const $=id=>document.getElementById(id), status=(message,level="info")=>{
   $("status").textContent=message;$("status").dataset.level=level;
@@ -321,6 +322,14 @@ function demoPose(){
   poseActive=true;setMode("rigged");
   status("Pose de test appliquée. Clique sur Repos avant de déplacer les articulations.");
 }
+async function exportCurrentRigBuffer(){
+ if(!rigged)throw Error('Aucun rig à exporter.');
+ resetPose();
+ const wasVisible=rigged.visible;rigged.visible=true;
+ const helperVisible=helpers?.visible;if(helpers)helpers.visible=false;
+ try{return await exporter.parseAsync(rigged,{binary:true,onlyVisible:true,trs:true,animations:originalIsRigged?nativeClips:[]})}
+ finally{rigged.visible=wasVisible;if(helpers)helpers.visible=helperVisible}
+}
 async function save(){
   if(!rigged)throw Error("Aucun rig à exporter.");
   resetPose();
@@ -328,7 +337,7 @@ async function save(){
   rigged.visible=true;
   const detached=helpers?.visible; if(helpers)helpers.visible=false;
   try{
-    const buffer=await exporter.parseAsync(rigged,{binary:true,onlyVisible:true,trs:true,animations:originalIsRigged?nativeClips:[]});
+    const buffer=await exportCurrentRigBuffer();
     const blob=new Blob([buffer],{type:"model/gltf-binary"});
     const url=URL.createObjectURL(blob),link=document.createElement("a");
     link.href=url;link.download=(sourceName||"avatar")+"_warlike_rig.glb";
@@ -337,6 +346,53 @@ async function save(){
     status("GLB riggé exporté ("+(blob.size/1048576).toFixed(1)+" Mio). Contrôle son import dans WarLike Engine.","success");
   }finally{rigged.visible=visible;if(helpers)helpers.visible=detached;}
 }
+// Batch exporter reuses the same auto-rig and skinning pipeline as the single model workflow.
+// Generated results are downloaded on demand, avoiding multiple automatic download prompts.
+const batchUrls=new Set();
+function clearBatchOutputs(){
+ for(const url of batchUrls)URL.revokeObjectURL(url);
+ batchUrls.clear();$("idolBatchResults").replaceChildren();
+}
+function syncBatchRun(){
+ $("idolBatchRun").disabled=batchActive||!$("idolBatchConfirm").checked||!$("idolBatchFiles").files?.length;
+}
+let batchActive=false;
+$("idolBatchFiles").addEventListener('change',syncBatchRun);
+$("idolBatchConfirm").addEventListener('change',syncBatchRun);
+$("idolBatchRun").addEventListener('click',async()=>{
+ if(batchActive||!$("idolBatchConfirm").checked)return;
+ let files;
+ try{files=validateIdolRigFiles($("idolBatchFiles").files)}catch(error){$("idolBatchStatus").textContent=error.message;return}
+ batchActive=true;syncBatchRun();clearBatchOutputs();
+ let ok=0;
+ try{
+  for(const [i,file] of files.entries()){
+   $("idolBatchStatus").textContent='Auto-rig '+(i+1)+'/'+files.length+' : '+file.name;
+   try{
+    await load(file);
+    if(modelInfo?.alreadyRigged){
+     if(!existingInfo?.valid)throw Error('Rig importé non conforme, conservé pour correction manuelle.');
+    }else{
+     if(!modelInfo?.canAutoRig)throw Error('Topologie non reconnue.');
+     generateRig();
+    }
+    const buffer=await exportCurrentRigBuffer();
+    const blob=new Blob([buffer],{type:'model/gltf-binary'}),url=URL.createObjectURL(blob);
+    batchUrls.add(url);
+    const link=document.createElement('a');link.href=url;
+    link.download=rigOutputName(file.name);
+    link.textContent='↓ '+link.download+' · '+(blob.size/1048576).toFixed(1)+' Mio · à valider dans WarLike Engine';
+    $("idolBatchResults").append(link);ok++;
+   }catch(error){
+    const msg=document.createElement('p');msg.textContent=file.name+' : '+error.message;
+    $("idolBatchResults").append(msg);
+   }
+   await new Promise(resolve=>setTimeout(resolve,0));
+  }
+  $("idolBatchStatus").textContent=ok+'/'+files.length+' GLB préparés. Télécharge les résultats et contrôle les déformations manuellement.';
+ }finally{batchActive=false;syncBatchRun()}
+});
+window.addEventListener('pagehide',clearBatchOutputs);
 $("file").addEventListener("change",async e=>{
   const f=e.target.files?.[0];e.target.value="";if(!f)return;
   setBusy(true);status("Chargement du modèle…");
