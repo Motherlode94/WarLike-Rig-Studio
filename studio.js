@@ -8,6 +8,7 @@ import {createRigEditor,rigGroup,RIG_COLORS} from "./rig-editor.mjs";
 import {RIG_TESTS,testAngles,diagnosticSummary} from "./rig-tester.mjs";
 import {inspectExistingSkeletons} from "./existing-rig.mjs";
 import {validateIdolRigFiles,rigOutputName} from "./idol-rig-batch.mjs";
+import {inspectRoundtripScene,assessRoundtrip} from "./rig-roundtrip.mjs";
 
 const $=id=>document.getElementById(id), status=(message,level="info")=>{
   $("status").textContent=message;$("status").dataset.level=level;
@@ -330,6 +331,23 @@ async function exportCurrentRigBuffer(){
  try{return await exporter.parseAsync(rigged,{binary:true,onlyVisible:true,trs:true,animations:originalIsRigged?nativeClips:[]})}
  finally{rigged.visible=wasVisible;if(helpers)helpers.visible=helperVisible}
 }
+async function verifyExportedRig(buffer){
+ const before=inspectRoundtripScene(rigged,originalIsRigged?nativeClips:[]);
+ const loaded=await loader.parseAsync(buffer,'');
+ const after=inspectRoundtripScene(loaded.scene,loaded.animations||[]);
+ return assessRoundtrip(before,after,{expectRig:true});
+}
+function showRoundtrip(report,file='modèle'){
+ const panel=$('roundtripResult');if(!panel)return;
+ panel.replaceChildren();
+ const title=document.createElement('strong');
+ title.textContent=file+' : '+(report.passed?'Intégrité GLB conservée':'Échec du contrôle de réimportation');
+ panel.append(title);
+ for(const item of [...report.failures,...report.warnings]){
+  const p=document.createElement('p');p.textContent=item;panel.append(p);
+ }
+ const note=document.createElement('p');note.textContent=report.disclaimer;panel.append(note);
+}
 async function save(){
   if(!rigged)throw Error("Aucun rig à exporter.");
   resetPose();
@@ -338,6 +356,8 @@ async function save(){
   const detached=helpers?.visible; if(helpers)helpers.visible=false;
   try{
     const buffer=await exportCurrentRigBuffer();
+    const report=await verifyExportedRig(buffer);showRoundtrip(report,sourceName||"avatar");
+    if(!report.passed)throw Error("GLB réimporté non conforme : "+report.failures.join(" ; "));
     const blob=new Blob([buffer],{type:"model/gltf-binary"});
     const url=URL.createObjectURL(blob),link=document.createElement("a");
     link.href=url;link.download=(sourceName||"avatar")+"_warlike_rig.glb";
@@ -377,6 +397,8 @@ $("idolBatchRun").addEventListener('click',async()=>{
      generateRig();
     }
     const buffer=await exportCurrentRigBuffer();
+    const report=await verifyExportedRig(buffer);showRoundtrip(report,file.name);
+    if(!report.passed)throw Error('Échec de la réimportation : '+report.failures.join(' ; '));
     const blob=new Blob([buffer],{type:'model/gltf-binary'}),url=URL.createObjectURL(blob);
     batchUrls.add(url);
     const link=document.createElement('a');link.href=url;
