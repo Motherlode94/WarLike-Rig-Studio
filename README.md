@@ -87,3 +87,10 @@ Chaque résultat apparaît comme un lien de téléchargement `*_warlike_rig.glb`
 Ne pas confondre « rig créé automatiquement » et « personnage validé pour concert ». Un contrôle artistique et de déformation est nécessaire avant tout usage public.
 
 Tests : `node --test tests/idol-rig-batch.test.mjs`.
+
+
+## Contrôle de réimportation du GLB
+
+Avant tout téléchargement individuel ou groupé, l'export GLB est **réimporté en mémoire** via GLTFLoader. Le test compare le nombre de sommets, les maillages skinnés, les os, les poids et indices de skinning, les morph targets, les matériaux/textures et les clips d'animation. Un échec critique bloque le téléchargement et fournit son diagnostic. Un succès **ne certifie pas la déformation en mouvement ni la ressemblance du visage**. Pour les sept Meshy, exécuter l'auto-rig sur les fichiers réels et contrôler chaque articulation en animation.
+
+Tests : `node --test tests/rig-roundtrip.test.mjs`.

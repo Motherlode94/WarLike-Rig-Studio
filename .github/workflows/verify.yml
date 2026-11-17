@@ -17,6 +17,7 @@ jobs:
           node --check rig-editor.mjs
           node --check menu.js
           node --check rig-tester.mjs
+          node --check rig-roundtrip.mjs
       - name: Automated rig tests
         run: node --test tests/*.test.mjs
       - name: Verify app files
